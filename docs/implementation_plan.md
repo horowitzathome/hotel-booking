@@ -218,3 +218,27 @@ Here a list of completed steps. For each step this is listed:
 
 **Open issues / reminders:** None.
 
+---
+
+### Step 9 — Domain Managers (2026-05-06)
+
+**Implemented:** Full Managers domain slice following the identical models → repositories → services → handlers → routes pattern as Countries:
+
+- `src/models/manager.rs` — `Manager` (with `sqlx::FromRow` + `Serialize`), `CreateManagerRequest`, `UpdateManagerRequest` (both `Deserialize`). Fields: `id`, `first_name`, `last_name`, `email`, `phone`.
+- `src/repositories/manager.rs` — five SQLx functions: `find_all` (ordered by `last_name, first_name`), `find_by_id`, `create`, `update`, `delete`. Same `RowNotFound` → `AppError::NotFound` and `rows_affected() == 0` patterns as Countries.
+- `src/services/manager.rs` — thin delegation layer over the repository.
+- `src/handlers/manager.rs` — five actix-web async handler functions. `create` returns 201 + `Location: /api/v1/managers/{id}` header.
+- Updated `src/models/mod.rs`, `src/repositories/mod.rs`, `src/services/mod.rs`, `src/handlers/mod.rs` — added `pub mod manager`.
+- `src/routes.rs` — added five routes under `/api/v1/managers` to the existing `/api/v1` scope.
+
+**Endpoints implemented:**
+- `GET /api/v1/managers` → 200 `[Manager]`
+- `GET /api/v1/managers/{id}` → 200 `Manager` (404 if missing)
+- `POST /api/v1/managers` → 201 + `Location` header + `Manager` body (409 on duplicate `email`)
+- `PUT /api/v1/managers/{id}` → 200 `Manager` (404 if missing, 409 on unique conflict)
+- `DELETE /api/v1/managers/{id}` → 204 (404 if missing, 409 if referenced by a house via FK violation)
+
+**Notes:** `cargo build` and `cargo clippy` succeed with only the pre-existing dead-code warning on unused `AppError` variants. The unique constraint on `email` (Postgres code `23505`) and the FK constraint from `houses.manager_id` (Postgres code `23503`) are both handled by the existing `AppError::from(sqlx::Error)` impl — no extra code needed.
+
+**Open issues / reminders:** None.
+
