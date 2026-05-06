@@ -156,3 +156,21 @@ Here a list of completed steps. For each step this is listed:
 
 **Open issues / reminders:** None.
 
+---
+
+### Step 6 — /health + /metrics endpoints (2026-05-06)
+
+**Implemented:**
+- Created `src/handlers/mod.rs` and `src/handlers/health.rs` — `health()` async handler returns `{ "status": "ok" }` with HTTP 200.
+- Added `PrometheusMetricsBuilder::new("api").endpoint("/metrics")` in `main.rs`; the resulting middleware is cloned into each actix worker via `App::wrap(prometheus.clone())`.
+- `TracingLogger` is placed *after* the Prometheus middleware so request traces include the metric collection overhead.
+- `GET /health` is wired directly in `main.rs` for now; domain routes will move to `routes.rs` in Step 7.
+
+**Notes:** Verified with a live run:
+- `curl /health` → `{"status":"ok"}`
+- `curl /metrics` → full Prometheus histogram/counter output (endpoint, method, status labels).
+- `cargo build` succeeds with only the expected dead-code warning on `AppError` (no handlers yet).
+
+**Open issues / reminders:**
+- Step 7 will introduce `routes.rs`; the `/health` route registration can stay in `main.rs` (it is an observability endpoint, not a domain route) or move to `routes.rs` — decide then.
+
