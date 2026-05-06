@@ -1,6 +1,6 @@
 use actix_web::web;
 
-use crate::handlers::{country, manager};
+use crate::handlers::{country, manager, person};
 
 pub fn configure(cfg: &mut web::ServiceConfig) {
     cfg.service(
@@ -14,6 +14,11 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .route("/managers", web::post().to(manager::create))
             .route("/managers/{id}", web::get().to(manager::get))
             .route("/managers/{id}", web::put().to(manager::update))
-            .route("/managers/{id}", web::delete().to(manager::delete)),
+            .route("/managers/{id}", web::delete().to(manager::delete))
+            .route("/persons", web::get().to(person::list))
+            .route("/persons", web::post().to(person::create))
+            .route("/persons/{id}", web::get().to(person::get))
+            .route("/persons/{id}", web::put().to(person::update))
+            .route("/persons/{id}", web::delete().to(person::delete)),
     );
 }

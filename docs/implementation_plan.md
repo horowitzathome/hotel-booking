@@ -242,3 +242,27 @@ Here a list of completed steps. For each step this is listed:
 
 **Open issues / reminders:** None.
 
+---
+
+### Step 10 — Domain Persons (2026-05-06)
+
+**Implemented:** Full Persons domain slice following the identical models → repositories → services → handlers → routes pattern as Managers:
+
+- `src/models/person.rs` — `Person` (with `sqlx::FromRow` + `Serialize`), `CreatePersonRequest`, `UpdatePersonRequest` (both `Deserialize`). Fields: `id`, `first_name`, `last_name`, `email`, `phone`.
+- `src/repositories/person.rs` — five SQLx functions: `find_all` (ordered by `last_name, first_name`), `find_by_id`, `create`, `update`, `delete`. Same `RowNotFound` → `AppError::NotFound` and `rows_affected() == 0` patterns as Managers.
+- `src/services/person.rs` — thin delegation layer over the repository.
+- `src/handlers/person.rs` — five actix-web async handler functions. `create` returns 201 + `Location: /api/v1/persons/{id}` header.
+- Updated `src/models/mod.rs`, `src/repositories/mod.rs`, `src/services/mod.rs`, `src/handlers/mod.rs` — added `pub mod person`.
+- `src/routes.rs` — added five routes under `/api/v1/persons` to the existing `/api/v1` scope.
+
+**Endpoints implemented:**
+- `GET /api/v1/persons` → 200 `[Person]`
+- `GET /api/v1/persons/{id}` → 200 `Person` (404 if missing)
+- `POST /api/v1/persons` → 201 + `Location` header + `Person` body (409 on duplicate `email`)
+- `PUT /api/v1/persons/{id}` → 200 `Person` (404 if missing, 409 on unique conflict)
+- `DELETE /api/v1/persons/{id}` → 204 (404 if missing, 409 if referenced by a booking via FK violation)
+
+**Notes:** `cargo build` and `cargo clippy` succeed with only the pre-existing dead-code warning on unused `AppError` variants. The unique constraint on `email` (Postgres code `23505`) and the FK constraint from `bookings.person_id` (Postgres code `23503`) are both handled by the existing `AppError::from(sqlx::Error)` impl — no extra code needed.
+
+**Open issues / reminders:** None.
+
