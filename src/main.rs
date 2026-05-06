@@ -2,6 +2,7 @@ mod config;
 mod db;
 mod errors;
 mod handlers;
+mod routes;
 
 use actix_web::{web, App, HttpServer};
 use actix_web_prom::PrometheusMetricsBuilder;
@@ -57,6 +58,7 @@ async fn main() -> Result<()> {
             .wrap(TracingLogger::default())
             .app_data(state.clone())
             .route("/health", web::get().to(handlers::health::health))
+            .configure(routes::configure)
     })
     .bind(&addr)?
     .run()

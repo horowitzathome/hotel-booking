@@ -174,3 +174,16 @@ Here a list of completed steps. For each step this is listed:
 **Open issues / reminders:**
 - Step 7 will introduce `routes.rs`; the `/health` route registration can stay in `main.rs` (it is an observability endpoint, not a domain route) or move to `routes.rs` — decide then.
 
+---
+
+### Step 7 — routes.rs: route registration stub (2026-05-06)
+
+**Implemented:**
+- Created `src/routes.rs` with a `configure(cfg: &mut web::ServiceConfig)` function that registers an empty `/api/v1/` scope — the single mount point for all future domain routes.
+- Registered `mod routes` in `main.rs` and wired `.configure(routes::configure)` into the `App` builder alongside the existing health and metrics endpoints.
+- `/health` stays in `main.rs` (observability, not a domain route); `/metrics` is managed by the Prometheus middleware — neither moves to `routes.rs`.
+
+**Notes:** `cargo build` succeeds with only the expected dead-code warning on `AppError`. The `/api/v1/` scope returns 404 for all paths until domain handlers are added in Phase 2.
+
+**Open issues / reminders:** None. Phase 1 is now complete — the server compiles, connects to Postgres, runs migrations, serves `/health` and `/metrics`, and has a wired `/api/v1/` scope ready for domain slices.
+
