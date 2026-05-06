@@ -187,3 +187,28 @@ Here a list of completed steps. For each step this is listed:
 
 **Open issues / reminders:** None. Phase 1 is now complete — the server compiles, connects to Postgres, runs migrations, serves `/health` and `/metrics`, and has a wired `/api/v1/` scope ready for domain slices.
 
+---
+
+### Step 8 — Domain Countries (2026-05-06)
+
+**Implemented:** Full Countries domain slice following the models → repositories → services → handlers → routes pattern:
+
+- `src/models/mod.rs` + `src/models/country.rs` — `Country` (with `sqlx::FromRow` + `Serialize`), `CreateCountryRequest`, `UpdateCountryRequest` (both `Deserialize`)
+- `src/repositories/mod.rs` + `src/repositories/country.rs` — five SQLx functions: `find_all`, `find_by_id`, `create`, `update`, `delete`. All use `query_as!` / `query!` macros for compile-time SQL validation. `find_by_id` and `update` map `RowNotFound` to a descriptive `AppError::NotFound`; `delete` checks `rows_affected() == 0` for the same.
+- `src/services/mod.rs` + `src/services/country.rs` — thin delegation layer over the repository (consistent with the layered architecture; business logic will grow here in later domains).
+- `src/handlers/country.rs` — five actix-web async handler functions wired to `web::Data<AppState>`. `create` returns 201 + `Location` header per the API spec.
+- `src/handlers/mod.rs` — added `pub mod country`.
+- `src/routes.rs` — replaced the empty scope stub with five routes under `/api/v1/countries`.
+- `src/main.rs` — added `mod models`, `mod repositories`, `mod services`.
+
+**Endpoints implemented:**
+- `GET /api/v1/countries` → 200 `[Country]`
+- `GET /api/v1/countries/{id}` → 200 `Country` (404 if missing)
+- `POST /api/v1/countries` → 201 + `Location` header + `Country` body (409 on duplicate `iso_code`)
+- `PUT /api/v1/countries/{id}` → 200 `Country` (404 if missing, 409 on unique conflict)
+- `DELETE /api/v1/countries/{id}` → 204 (404 if missing, 409 if referenced by an address)
+
+**Notes:** `cargo build` and `cargo clippy` succeed with only the pre-existing dead-code warnings on `AppError` variants not yet used by any handler. The `CHAR(2)` Postgres column for `iso_code` maps cleanly to `String` via sqlx. The FK violation (Postgres code `23503`) on delete is already handled by the existing `AppError::from(sqlx::Error)` impl, which maps it to 409 Conflict.
+
+**Open issues / reminders:** None.
+

@@ -2,7 +2,10 @@ mod config;
 mod db;
 mod errors;
 mod handlers;
+mod models;
+mod repositories;
 mod routes;
+mod services;
 
 use actix_web::{web, App, HttpServer};
 use actix_web_prom::PrometheusMetricsBuilder;
