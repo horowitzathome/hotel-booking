@@ -1,4 +1,5 @@
 pub mod address;
+pub mod booking;
 pub mod calendar;
 pub mod country;
 pub mod health;

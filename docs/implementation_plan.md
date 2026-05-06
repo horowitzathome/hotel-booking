@@ -338,3 +338,27 @@ Here a list of completed steps. For each step this is listed:
 **Notes:** `cargo build` and `cargo clippy` succeed with only the pre-existing dead-code warning on `ValidationError`. Key patterns: (1) the `ON CONFLICT DO NOTHING RETURNING` + `fetch_optional` trick to identify only newly inserted rows; (2) the `$2::date IS NULL OR date >= $2` pattern for optional date range filtering in a single `query!` macro call; (3) the booking overlap check uses a four-way JOIN (`calendar → bookings → calendar c_from → calendar c_to`) to find calendar entries that fall within the date range of any non-cancelled booking. The `serde-with-float` change in Cargo.toml does not affect any existing domain (Countries, Addresses, Managers, Persons, Houses) since none of them use `Decimal`.
 
 **Open issues / reminders:** None.
+
+---
+
+### Step 14 — Domain Bookings (2026-05-06)
+
+**Implemented:** Full Bookings domain slice — the most complex domain, involving status transitions, calendar entry flipping, and payment recording:
+
+- `src/models/booking.rs` — `BookingHouse` (`id`, `name`), `BookingPerson` (`id`, `first_name`, `last_name`), `Booking` (embeds both; has `expected_total_price: Option<Decimal>` with `#[serde(skip_serializing_if = "Option::is_none")]` so it only appears in the create 201 response), `CreateBookingRequest` (`house_id`, `person_id`, `from`, `to`), `RecordPaymentRequest` (`paid_at`, `total_paid`).
+- `src/repositories/booking.rs` — five functions: `find_all` (four-table JOIN with optional `$1::bigint IS NULL OR b.house_id = $1` pattern for house/person filters), `find_by_id` (same JOIN by booking id), `create` (transaction: `FOR UPDATE` lock on calendar range → validate count and all-Rentable → insert booking → flip calendar to Rented; returns `(Booking, expected_total_price)`), `cancel` (transaction: `FOR UPDATE OF b` lock → check not already Cancelled → update booking to Cancelled + clear payment → flip calendar back to Rentable), `record_payment` (check not Cancelled → update paid_at + total_paid).
+- `src/services/booking.rs` — thin delegation; `create` validates `from <= to` (422) then merges `expected_total_price` into the returned `Booking`.
+- `src/handlers/booking.rs` — five actix-web async handler functions. `BookingListQuery` has optional `house_id` and `person_id` query params. `create` returns 201 + `Location: /api/v1/bookings/{id}`.
+- Updated `src/models/mod.rs`, `src/repositories/mod.rs`, `src/services/mod.rs`, `src/handlers/mod.rs` — added `pub mod booking`.
+- `src/routes.rs` — added five routes under `/api/v1/bookings`.
+
+**Endpoints implemented:**
+- `GET /api/v1/bookings?house_id=&person_id=` → 200 `[Booking]` (both query params optional)
+- `GET /api/v1/bookings/{id}` → 200 `Booking` (404 if missing)
+- `POST /api/v1/bookings` → 201 + `Location` header + `Booking` body including `expected_total_price` (422 if from > to, 422 if any day missing or not Rentable, 409 on FK violation for unknown house/person)
+- `POST /api/v1/bookings/{id}/cancel` → 200 `Booking` (404 if missing, 422 if already Cancelled)
+- `POST /api/v1/bookings/{id}/payment` → 200 `Booking` (404 if missing, 422 if Cancelled)
+
+**Notes:** `cargo build` and `cargo clippy` succeed with only the pre-existing dead-code warning on `ValidationError`. Key patterns: (1) the `(Booking, Decimal)` tuple return from `repo::create` lets the service layer attach `expected_total_price` without the repository needing to know about the field; (2) `FOR UPDATE` on the calendar range in `create` prevents race conditions between concurrent booking attempts for overlapping date ranges; (3) `FOR UPDATE OF b` in `cancel` locks only the bookings row, not the joined calendar rows; (4) the `$1::bigint IS NULL OR b.house_id = $1` pattern mirrors the `$2::date IS NULL OR date >= $2` pattern from Calendar for optional filter parameters in a single `query!` call.
+
+**Open issues / reminders:** None. Phase 2 is now complete — all domain vertical slices (Countries, Managers, Persons, Addresses, Houses, Calendar, Bookings) are implemented.
