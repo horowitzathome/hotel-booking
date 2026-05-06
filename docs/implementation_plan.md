@@ -140,6 +140,19 @@ Here a list of completed steps. For each step this is listed:
 
 **Open issues / reminders:** None.
 
+---
 
+### Step 5 — errors.rs: AppError enum (2026-05-06)
 
+**Implemented:** Created `src/errors.rs` and registered it as `mod errors` in `main.rs`:
+- `AppError` enum with five variants: `NotFound(String)`, `Conflict(String)`, `UnprocessableEntity(String)`, `ValidationError(Vec<String>)`, `Internal(#[source] anyhow::Error)`
+- `ResponseError` impl maps variants to HTTP status codes: 404 / 409 / 422 / 400 / 500
+- `error_response()` produces the standard JSON body `{"error": "...", "details": [...]}` per the API spec; `details` is only included for `ValidationError`
+- `Internal` errors log the full error with `tracing::error!` but return a generic `"internal server error"` message to clients — no internal details leak to the user
+- `From<sqlx::Error>`: maps `RowNotFound` → `NotFound`, Postgres code `23505` (unique violation) and `23503` (FK violation) → `Conflict`, all others → `Internal`
+- `From<anyhow::Error>`: wraps into `Internal`
+
+**Notes:** `cargo build` succeeds with a single expected dead-code warning (`AppError` unused until handlers are added). The approach matches the actix-web `ResponseError` trait contract — implementing only `status_code` and `error_response` is sufficient.
+
+**Open issues / reminders:** None.
 

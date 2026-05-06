@@ -1,5 +1,6 @@
 mod config;
 mod db;
+mod errors;
 
 use actix_web::{web, App, HttpServer};
 use anyhow::Result;

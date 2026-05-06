@@ -51,3 +51,11 @@ db-migrate-info:
 # Create a new reversible migration  (usage: just db-migrate-add name=add_foo_column)
 db-migrate-add name:
     sqlx migrate add --reversible {{ name }}
+
+# Run server in dev mode
+run-dev:
+    cargo run
+
+# Run server in prod mode
+run-prod:
+    cargo run --release
