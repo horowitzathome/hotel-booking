@@ -1,6 +1,6 @@
 use actix_web::web;
 
-use crate::handlers::{address, country, manager, person};
+use crate::handlers::{address, calendar, country, house, manager, person};
 
 pub fn configure(cfg: &mut web::ServiceConfig) {
     cfg.service(
@@ -9,6 +9,31 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .route("/addresses/{id}", web::get().to(address::get))
             .route("/addresses/{id}", web::put().to(address::update))
             .route("/addresses/{id}", web::delete().to(address::delete))
+            .route("/houses", web::get().to(house::list))
+            .route("/houses", web::post().to(house::create))
+            .route("/houses/{id}", web::get().to(house::get))
+            .route("/houses/{id}", web::put().to(house::update))
+            .route("/houses/{id}", web::delete().to(house::delete))
+            .route(
+                "/houses/{house_id}/calendar",
+                web::get().to(calendar::list),
+            )
+            .route(
+                "/houses/{house_id}/calendar",
+                web::post().to(calendar::create),
+            )
+            .route(
+                "/houses/{house_id}/calendar",
+                web::patch().to(calendar::update_price),
+            )
+            .route(
+                "/houses/{house_id}/calendar",
+                web::delete().to(calendar::delete),
+            )
+            .route(
+                "/houses/{house_id}/calendar/{id}",
+                web::get().to(calendar::get),
+            )
             .route("/countries", web::get().to(country::list))
             .route("/countries", web::post().to(country::create))
             .route("/countries/{id}", web::get().to(country::get))

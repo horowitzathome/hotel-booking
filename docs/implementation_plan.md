@@ -290,3 +290,51 @@ Here a list of completed steps. For each step this is listed:
 
 **Open issues / reminders:** None.
 
+---
+
+### Step 12 — Domain Houses (2026-05-06)
+
+**Implemented:** Full Houses domain slice following the models → repositories → services → handlers → routes pattern:
+
+- `src/models/house.rs` — `House` (with `Serialize`; embeds `Address` and `Manager` as nested structs), `CreateHouseRequest`, `UpdateHouseRequest` (both `Deserialize`). Fields: `id`, `name`, `description`, `address` (embedded `Address` with embedded `Country`), `manager` (embedded `Manager`). Request types carry `address_id` and `manager_id` (FKs) rather than full objects.
+- `src/repositories/house.rs` — five functions: `find_all`, `find_by_id`, `create`, `update`, `delete`. Both `find_all` and `find_by_id` use a four-table JOIN (`houses → addresses → countries`, `houses → managers`) with explicit column aliases and manual struct construction in Rust (same pattern as Addresses). `find_all` orders by `h.name`. `create` uses `query_scalar!` to get the new `id` then delegates to `find_by_id`. `update` uses `execute` with `rows_affected() == 0` check (→ 404), then delegates to `find_by_id`. `delete` follows the same `rows_affected` pattern.
+- `src/services/house.rs` — thin delegation layer over the repository (five functions: `list`, `get`, `create`, `update`, `delete`).
+- `src/handlers/house.rs` — five actix-web async handler functions. `create` returns 201 + `Location: /api/v1/houses/{id}` header.
+- Updated `src/models/mod.rs`, `src/repositories/mod.rs`, `src/services/mod.rs`, `src/handlers/mod.rs` — added `pub mod house`.
+- `src/routes.rs` — added five routes under `/api/v1/houses` to the existing `/api/v1` scope.
+
+**Endpoints implemented:**
+- `GET /api/v1/houses` → 200 `[House]` with embedded `Address` (+ `Country`) and `Manager`
+- `GET /api/v1/houses/{id}` → 200 `House` (404 if missing)
+- `POST /api/v1/houses` → 201 + `Location` header + `House` body (409 on FK violation for unknown `address_id` or `manager_id`)
+- `PUT /api/v1/houses/{id}` → 200 `House` (404 if missing, 409 on FK violation)
+- `DELETE /api/v1/houses/{id}` → 204 (404 if missing, 409 if referenced by a booking via FK violation)
+
+**Notes:** The key pattern here is the four-table JOIN query shared by `find_all` and `find_by_id`, using column aliases (e.g. `addr_id`, `mgr_first_name`, `country_iso_code`) to avoid name collisions across joined tables. Manual struct construction in Rust is used instead of `sqlx::FromRow` + `#[sqlx(flatten)]`, which conflicts on shared `id` column names. The write-then-read pattern (`INSERT`/`UPDATE` → `find_by_id`) avoids duplicating the JOIN SQL. FK violations for unknown `address_id` or `manager_id` (Postgres code `23503`) and booking references on delete are handled by the existing `AppError::from(sqlx::Error)` impl.
+
+**Open issues / reminders:** None.
+
+---
+
+### Step 13 — Domain Calendar (2026-05-06)
+
+**Implemented:** Full Calendar domain slice as a sub-resource of House:
+
+- `src/models/calendar.rs` — `CalendarEntry` (`id`, `date: NaiveDate`, `status: String`, `price: Decimal`), `CreateCalendarRequest` (`from`, `to`, `status`, `price`), `UpdateCalendarPriceRequest` (`from`, `to`, `price`).
+- `src/repositories/calendar.rs` — five functions: `find_all` (with optional `from`/`to` query filters via `$2::date IS NULL OR date >= $2` pattern), `find_by_id` (checks both `id` and `house_id`), `create` (per-day loop with `INSERT ... ON CONFLICT (house_id, date) DO NOTHING RETURNING ...` inside a transaction; `fetch_optional` returns `None` for skipped days), `update_price` (`UPDATE ... RETURNING` for the date range, sorted by date), `delete` (JOIN query against `bookings` to detect active booking overlap before deletion).
+- `src/services/calendar.rs` — thin delegation with business-rule validation: `create` rejects `status = 'Rented'` (422) and invalid status values (422); `create`, `update_price`, and `delete` all reject `from > to` (422).
+- `src/handlers/calendar.rs` — five actix-web async handler functions; `CalendarListQuery` has optional `from`/`to` for the list endpoint; `CalendarDeleteQuery` has required `from`/`to` as query params for delete; `create` returns 201 + `Location` header + array body.
+- Updated `src/models/mod.rs`, `src/repositories/mod.rs`, `src/services/mod.rs`, `src/handlers/mod.rs` — added `pub mod calendar`.
+- `src/routes.rs` — added five routes under `/api/v1/houses/{house_id}/calendar`.
+- `Cargo.toml` — changed `rust_decimal` feature from `serde-with-str` to `serde-with-float` so that `Decimal` serializes as a JSON number (e.g. `120.0`) as required by the API spec, not as a string.
+
+**Endpoints implemented:**
+- `GET /api/v1/houses/{house_id}/calendar?from=&to=` → 200 `[CalendarEntry]` (both query params optional)
+- `GET /api/v1/houses/{house_id}/calendar/{id}` → 200 `CalendarEntry` (404 if missing or wrong house)
+- `POST /api/v1/houses/{house_id}/calendar` → 201 + `Location` header + `[CalendarEntry]` (only newly created entries; existing days silently skipped; 422 for `Rented` status or invalid status or `from > to`)
+- `PATCH /api/v1/houses/{house_id}/calendar` → 200 `[CalendarEntry]` updated entries
+- `DELETE /api/v1/houses/{house_id}/calendar?from=&to=` → 204 (409 if any entry in range belongs to a non-cancelled booking)
+
+**Notes:** `cargo build` and `cargo clippy` succeed with only the pre-existing dead-code warning on `ValidationError`. Key patterns: (1) the `ON CONFLICT DO NOTHING RETURNING` + `fetch_optional` trick to identify only newly inserted rows; (2) the `$2::date IS NULL OR date >= $2` pattern for optional date range filtering in a single `query!` macro call; (3) the booking overlap check uses a four-way JOIN (`calendar → bookings → calendar c_from → calendar c_to`) to find calendar entries that fall within the date range of any non-cancelled booking. The `serde-with-float` change in Cargo.toml does not affect any existing domain (Countries, Addresses, Managers, Persons, Houses) since none of them use `Decimal`.
+
+**Open issues / reminders:** None.

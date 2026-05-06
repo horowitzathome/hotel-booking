@@ -37,4 +37,4 @@ dotenvy = "0.15"
 
 # Types
 chrono = { version = "0.4", features = ["serde"] }
-rust_decimal = { version = "1", features = ["serde-with-str"] }
+rust_decimal = { version = "1", features = ["serde-with-float"] }
