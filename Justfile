@@ -59,3 +59,30 @@ run-dev:
 # Run server in prod mode
 run-prod:
     cargo run --release
+
+# Run all tests
+test:
+    cargo test
+
+# Run tests with output visible
+test-verbose:
+    cargo test -- --nocapture
+
+# Run a single test by name (usage: just test-one name=my_test)
+test-one name:
+    cargo test {{ name }}
+
+# Run tests for a specific module (usage: just test-mod mod=services::booking)
+test-mod mod:
+    cargo test {{ mod }}
+
+# Run clippy then all tests
+check: lint test
+
+# Run clippy
+lint:
+    cargo clippy -- -D warnings
+
+# Format code
+fmt:
+    cargo fmt

@@ -65,10 +65,12 @@ CREATE TABLE calendar (
 -- Bookings ----------------------------------------------------------------
 CREATE TABLE bookings (
     id               BIGSERIAL      PRIMARY KEY,
-    house_id         BIGINT         NOT NULL REFERENCES houses    (id),
-    person_id        BIGINT         NOT NULL REFERENCES persons   (id),
-    from_calendar_id BIGINT         NOT NULL REFERENCES calendar  (id),
-    to_calendar_id   BIGINT         NOT NULL REFERENCES calendar  (id),
+    house_id         BIGINT         NOT NULL REFERENCES houses   (id),
+    person_id        BIGINT         NOT NULL REFERENCES persons  (id),
+    from_calendar_id BIGINT         REFERENCES calendar (id) ON DELETE SET NULL,
+    to_calendar_id   BIGINT         REFERENCES calendar (id) ON DELETE SET NULL,
+    from_date        DATE           NOT NULL,
+    to_date          DATE           NOT NULL,
     status           VARCHAR(20)    NOT NULL DEFAULT 'Active',
     paid_at          DATE,
     total_paid       NUMERIC(10, 2),
