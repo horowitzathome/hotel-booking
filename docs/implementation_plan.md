@@ -266,3 +266,27 @@ Here a list of completed steps. For each step this is listed:
 
 **Open issues / reminders:** None.
 
+
+---
+
+### Step 11 — Domain Addresses (2026-05-06)
+
+**Implemented:** Full Addresses domain slice following the models → repositories → services → handlers → routes pattern:
+
+- `src/models/address.rs` — `Address` (with `Serialize`; embeds `Country` as a nested struct), `CreateAddressRequest`, `UpdateAddressRequest` (both `Deserialize`). Fields: `id`, `street`, `number`, `postcode`, `city`, `province` (optional), `country` (embedded `Country`). The request types carry `country_id` (FK) rather than the full object.
+- `src/repositories/address.rs` — four functions: `find_by_id`, `create`, `update`, `delete`. `find_by_id` uses a single JOIN query (`query!` macro) that fetches address and country columns with aliases (`country_id`, `country_name`, `country_iso_code`) and constructs the nested `Address` struct in Rust. `create` inserts with `query_scalar!` to obtain the new `id`, then delegates to `find_by_id` for the full response. `update` uses `execute` with rows_affected check (→ 404), then delegates to `find_by_id`. `delete` follows the same rows_affected pattern as earlier domains.
+- `src/services/address.rs` — thin delegation layer (no `list` — the API spec has no list-all endpoint for addresses).
+- `src/handlers/address.rs` — four actix-web async handler functions. `create` returns 201 + `Location: /api/v1/addresses/{id}` header.
+- Updated `src/models/mod.rs`, `src/repositories/mod.rs`, `src/services/mod.rs`, `src/handlers/mod.rs` — added `pub mod address`.
+- `src/routes.rs` — added four routes under `/api/v1/addresses` (no list route, per API spec).
+
+**Endpoints implemented:**
+- `GET /api/v1/addresses/{id}` → 200 `Address` with embedded `Country` (404 if missing)
+- `POST /api/v1/addresses` → 201 + `Location` header + `Address` body (409 on FK violation for unknown `country_id`)
+- `PUT /api/v1/addresses/{id}` → 200 `Address` (404 if missing, 409 on FK violation for unknown `country_id`)
+- `DELETE /api/v1/addresses/{id}` → 204 (404 if missing, 409 if referenced by a house via FK violation)
+
+**Notes:** `cargo build` and `cargo clippy` succeed with only the pre-existing dead-code warning. The key difference from prior domains is the embedded `Country` in the response. Rather than using `sqlx::FromRow` with `#[sqlx(flatten)]` (which conflicts on the shared `id` column name), the repository uses a `query!` macro with explicit column aliases and manual struct construction in Rust. The `create`/`update` path uses a two-step write-then-read pattern (INSERT/UPDATE → `find_by_id`) to avoid duplicating the JOIN SQL.
+
+**Open issues / reminders:** None.
+

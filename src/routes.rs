@@ -1,10 +1,14 @@
 use actix_web::web;
 
-use crate::handlers::{country, manager, person};
+use crate::handlers::{address, country, manager, person};
 
 pub fn configure(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/api/v1")
+            .route("/addresses", web::post().to(address::create))
+            .route("/addresses/{id}", web::get().to(address::get))
+            .route("/addresses/{id}", web::put().to(address::update))
+            .route("/addresses/{id}", web::delete().to(address::delete))
             .route("/countries", web::get().to(country::list))
             .route("/countries", web::post().to(country::create))
             .route("/countries/{id}", web::get().to(country::get))
