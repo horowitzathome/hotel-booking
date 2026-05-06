@@ -18,16 +18,14 @@ pub async fn find_all(
             b.person_id,
             p.first_name     AS person_first_name,
             p.last_name      AS person_last_name,
-            c_from.date      AS from_date,
-            c_to.date        AS to_date,
+            b.from_date,
+            b.to_date,
             b.status,
             b.paid_at,
             b.total_paid
         FROM bookings b
-        JOIN houses h        ON h.id      = b.house_id
-        JOIN persons p       ON p.id      = b.person_id
-        JOIN calendar c_from ON c_from.id = b.from_calendar_id
-        JOIN calendar c_to   ON c_to.id   = b.to_calendar_id
+        JOIN houses h  ON h.id = b.house_id
+        JOIN persons p ON p.id = b.person_id
         WHERE ($1::bigint IS NULL OR b.house_id = $1)
           AND ($2::bigint IS NULL OR b.person_id = $2)
         ORDER BY b.id
@@ -69,16 +67,14 @@ pub async fn find_by_id(pool: &PgPool, id: i64) -> Result<Booking, AppError> {
             b.person_id,
             p.first_name     AS person_first_name,
             p.last_name      AS person_last_name,
-            c_from.date      AS from_date,
-            c_to.date        AS to_date,
+            b.from_date,
+            b.to_date,
             b.status,
             b.paid_at,
             b.total_paid
         FROM bookings b
-        JOIN houses h        ON h.id      = b.house_id
-        JOIN persons p       ON p.id      = b.person_id
-        JOIN calendar c_from ON c_from.id = b.from_calendar_id
-        JOIN calendar c_to   ON c_to.id   = b.to_calendar_id
+        JOIN houses h  ON h.id = b.house_id
+        JOIN persons p ON p.id = b.person_id
         WHERE b.id = $1
         "#,
         id,
@@ -148,14 +144,16 @@ pub async fn create(
 
     let booking_id: i64 = sqlx::query_scalar!(
         r#"
-        INSERT INTO bookings (house_id, person_id, from_calendar_id, to_calendar_id, status)
-        VALUES ($1, $2, $3, $4, 'Active')
+        INSERT INTO bookings (house_id, person_id, from_calendar_id, to_calendar_id, from_date, to_date, status)
+        VALUES ($1, $2, $3, $4, $5, $6, 'Active')
         RETURNING id
         "#,
         req.house_id,
         req.person_id,
         from_calendar_id,
         to_calendar_id,
+        req.from,
+        req.to,
     )
     .fetch_one(&mut *tx)
     .await
@@ -182,12 +180,10 @@ pub async fn cancel(pool: &PgPool, id: i64) -> Result<Booking, AppError> {
 
     let row = sqlx::query!(
         r#"
-        SELECT b.status, b.house_id, c_from.date AS from_date, c_to.date AS to_date
-        FROM bookings b
-        JOIN calendar c_from ON c_from.id = b.from_calendar_id
-        JOIN calendar c_to   ON c_to.id   = b.to_calendar_id
-        WHERE b.id = $1
-        FOR UPDATE OF b
+        SELECT status, house_id, from_date, to_date
+        FROM bookings
+        WHERE id = $1
+        FOR UPDATE
         "#,
         id,
     )

@@ -1,20 +1,9 @@
-mod config;
-mod db;
-mod errors;
-mod handlers;
-mod models;
-mod repositories;
-mod routes;
-mod services;
+use claude_test::{config, db, handlers, routes, AppState};
 
 use actix_web::{web, App, HttpServer};
 use actix_web_prom::PrometheusMetricsBuilder;
 use anyhow::Result;
 use tracing_actix_web::TracingLogger;
-
-pub struct AppState {
-    pub pool: sqlx::PgPool,
-}
 
 fn init_tracing(is_development: bool) {
     use tracing_subscriber::EnvFilter;
