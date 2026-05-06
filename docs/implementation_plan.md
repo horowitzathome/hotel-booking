@@ -62,13 +62,19 @@ Most complex: status transitions, calendar flip, payment
 
 ## Phase 3 — Cross-cutting polish
 
-Step Step 15: Tracing span enrichment (request-id via tracing-actix-web)
+Step 15: OpenAPI / Swagger UI (utoipa + utoipa-swagger-ui)
 
-Step 16: Input validation (validator crate, #[validate] on request structs)
+Add `utoipa = "4"` (features: actix_extras) and `utoipa-swagger-ui = "8"` (feature: actix-web) to Cargo.toml.
+Derive `#[derive(ToSchema)]` on all model structs (Country, Address, Manager, Person, House, CalendarEntry, Booking and their request types).
+Annotate every handler with `#[utoipa::path(...)]`. Build an `ApiDoc` with `#[derive(OpenApi)]` in a new `src/openapi.rs`, register it in `main.rs`, and mount `SwaggerUi` at `/swagger-ui`.
 
-Step 17: Dockerfile (multi-stage with cargo-chef + distroless)
+Step 16: Tracing span enrichment (request-id via tracing-actix-web)
 
-Step 18: GitHub Actions CI pipeline
+Step 17: Input validation (validator crate, #[validate] on request structs)
+
+Step 18: Dockerfile (multi-stage with cargo-chef + distroless)
+
+Step 19: GitHub Actions CI pipeline
 
 ## Suggested starting point
 
