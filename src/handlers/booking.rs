@@ -12,6 +12,17 @@ pub struct BookingListQuery {
     pub person_id: Option<i64>,
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/bookings",
+    tag = "bookings",
+    operation_id = "list_bookings",
+    params(
+        ("house_id" = Option<i64>, Query, description = "Filter by house id"),
+        ("person_id" = Option<i64>, Query, description = "Filter by person id")
+    ),
+    responses((status = 200, description = "List of bookings", body = [crate::models::booking::Booking]))
+)]
 pub async fn list(
     state: web::Data<AppState>,
     query: web::Query<BookingListQuery>,
@@ -20,6 +31,17 @@ pub async fn list(
     Ok(HttpResponse::Ok().json(bookings))
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/bookings/{id}",
+    tag = "bookings",
+    operation_id = "get_booking",
+    params(("id" = i64, Path, description = "Booking id")),
+    responses(
+        (status = 200, description = "Booking", body = crate::models::booking::Booking),
+        (status = 404, description = "Booking not found")
+    )
+)]
 pub async fn get(
     state: web::Data<AppState>,
     path: web::Path<i64>,
@@ -28,6 +50,18 @@ pub async fn get(
     Ok(HttpResponse::Ok().json(booking))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/bookings",
+    tag = "bookings",
+    operation_id = "create_booking",
+    request_body = CreateBookingRequest,
+    responses(
+        (status = 201, description = "Booking created (includes expected_total_price)", body = crate::models::booking::Booking),
+        (status = 409, description = "Unknown house_id or person_id"),
+        (status = 422, description = "from > to or any day not Rentable")
+    )
+)]
 pub async fn create(
     state: web::Data<AppState>,
     body: web::Json<CreateBookingRequest>,
@@ -39,6 +73,18 @@ pub async fn create(
         .json(booking))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/bookings/{id}/cancel",
+    tag = "bookings",
+    operation_id = "cancel_booking",
+    params(("id" = i64, Path, description = "Booking id")),
+    responses(
+        (status = 200, description = "Booking cancelled", body = crate::models::booking::Booking),
+        (status = 404, description = "Booking not found"),
+        (status = 422, description = "Booking already cancelled")
+    )
+)]
 pub async fn cancel(
     state: web::Data<AppState>,
     path: web::Path<i64>,
@@ -47,6 +93,19 @@ pub async fn cancel(
     Ok(HttpResponse::Ok().json(booking))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/bookings/{id}/payment",
+    tag = "bookings",
+    operation_id = "record_booking_payment",
+    params(("id" = i64, Path, description = "Booking id")),
+    request_body = RecordPaymentRequest,
+    responses(
+        (status = 200, description = "Payment recorded", body = crate::models::booking::Booking),
+        (status = 404, description = "Booking not found"),
+        (status = 422, description = "Booking is cancelled")
+    )
+)]
 pub async fn record_payment(
     state: web::Data<AppState>,
     path: web::Path<i64>,

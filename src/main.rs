@@ -1,9 +1,11 @@
-use claude_test::{config, db, handlers, routes, AppState};
+use claude_test::{config, db, handlers, openapi::ApiDoc, routes, AppState};
 
 use actix_web::{web, App, HttpServer};
 use actix_web_prom::PrometheusMetricsBuilder;
 use anyhow::Result;
 use tracing_actix_web::TracingLogger;
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
 
 fn init_tracing(is_development: bool) {
     use tracing_subscriber::EnvFilter;
@@ -44,12 +46,18 @@ async fn main() -> Result<()> {
 
     tracing::info!(address = %addr, "listening");
 
+    let openapi = ApiDoc::openapi();
+
     HttpServer::new(move || {
         App::new()
             .wrap(prometheus.clone())
             .wrap(TracingLogger::default())
             .app_data(state.clone())
             .route("/health", web::get().to(handlers::health::health))
+            .service(
+                SwaggerUi::new("/swagger-ui/{_:.*}")
+                    .url("/api-docs/openapi.json", openapi.clone()),
+            )
             .configure(routes::configure)
     })
     .bind(&addr)?

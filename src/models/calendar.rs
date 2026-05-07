@@ -1,8 +1,9 @@
 use chrono::NaiveDate;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema, sqlx::Type)]
 #[sqlx(type_name = "calendar_status")]
 pub enum CalendarStatus {
     NotRentable,
@@ -10,7 +11,7 @@ pub enum CalendarStatus {
     Rented,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct CalendarEntry {
     pub id: i64,
     pub date: NaiveDate,
@@ -18,7 +19,7 @@ pub struct CalendarEntry {
     pub price: Decimal,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateCalendarRequest {
     pub from: NaiveDate,
     pub to: NaiveDate,
@@ -26,7 +27,7 @@ pub struct CreateCalendarRequest {
     pub price: Decimal,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct UpdateCalendarPriceRequest {
     pub from: NaiveDate,
     pub to: NaiveDate,

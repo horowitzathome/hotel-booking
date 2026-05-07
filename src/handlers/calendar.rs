@@ -19,6 +19,18 @@ pub struct CalendarDeleteQuery {
     pub to: NaiveDate,
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/houses/{house_id}/calendar",
+    tag = "calendar",
+    operation_id = "list_calendar_entries",
+    params(
+        ("house_id" = i64, Path, description = "House id"),
+        ("from" = Option<chrono::NaiveDate>, Query, description = "Start date (inclusive)"),
+        ("to" = Option<chrono::NaiveDate>, Query, description = "End date (inclusive)")
+    ),
+    responses((status = 200, description = "Calendar entries", body = [crate::models::calendar::CalendarEntry]))
+)]
 pub async fn list(
     state: web::Data<AppState>,
     path: web::Path<i64>,
@@ -28,6 +40,20 @@ pub async fn list(
     Ok(HttpResponse::Ok().json(entries))
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/houses/{house_id}/calendar/{id}",
+    tag = "calendar",
+    operation_id = "get_calendar_entry",
+    params(
+        ("house_id" = i64, Path, description = "House id"),
+        ("id" = i64, Path, description = "Calendar entry id")
+    ),
+    responses(
+        (status = 200, description = "Calendar entry", body = crate::models::calendar::CalendarEntry),
+        (status = 404, description = "Entry not found")
+    )
+)]
 pub async fn get(
     state: web::Data<AppState>,
     path: web::Path<(i64, i64)>,
@@ -37,6 +63,18 @@ pub async fn get(
     Ok(HttpResponse::Ok().json(entry))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/houses/{house_id}/calendar",
+    tag = "calendar",
+    operation_id = "create_calendar_entries",
+    params(("house_id" = i64, Path, description = "House id")),
+    request_body = CreateCalendarRequest,
+    responses(
+        (status = 201, description = "Newly created entries (existing days skipped)", body = [crate::models::calendar::CalendarEntry]),
+        (status = 422, description = "Invalid status, Rented disallowed, or from > to")
+    )
+)]
 pub async fn create(
     state: web::Data<AppState>,
     path: web::Path<i64>,
@@ -50,6 +88,18 @@ pub async fn create(
         .json(entries))
 }
 
+#[utoipa::path(
+    patch,
+    path = "/api/v1/houses/{house_id}/calendar",
+    tag = "calendar",
+    operation_id = "update_calendar_prices",
+    params(("house_id" = i64, Path, description = "House id")),
+    request_body = UpdateCalendarPriceRequest,
+    responses(
+        (status = 200, description = "Updated entries", body = [crate::models::calendar::CalendarEntry]),
+        (status = 422, description = "from > to")
+    )
+)]
 pub async fn update_price(
     state: web::Data<AppState>,
     path: web::Path<i64>,
@@ -60,6 +110,22 @@ pub async fn update_price(
     Ok(HttpResponse::Ok().json(entries))
 }
 
+#[utoipa::path(
+    delete,
+    path = "/api/v1/houses/{house_id}/calendar",
+    tag = "calendar",
+    operation_id = "delete_calendar_entries",
+    params(
+        ("house_id" = i64, Path, description = "House id"),
+        ("from" = chrono::NaiveDate, Query, description = "Start date (inclusive)"),
+        ("to" = chrono::NaiveDate, Query, description = "End date (inclusive)")
+    ),
+    responses(
+        (status = 204, description = "Entries deleted"),
+        (status = 409, description = "An entry is referenced by a non-cancelled booking"),
+        (status = 422, description = "from > to")
+    )
+)]
 pub async fn delete(
     state: web::Data<AppState>,
     path: web::Path<i64>,

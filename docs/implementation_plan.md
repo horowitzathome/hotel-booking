@@ -362,3 +362,29 @@ Here a list of completed steps. For each step this is listed:
 **Notes:** `cargo build` and `cargo clippy` succeed with only the pre-existing dead-code warning on `ValidationError`. Key patterns: (1) the `(Booking, Decimal)` tuple return from `repo::create` lets the service layer attach `expected_total_price` without the repository needing to know about the field; (2) `FOR UPDATE` on the calendar range in `create` prevents race conditions between concurrent booking attempts for overlapping date ranges; (3) `FOR UPDATE OF b` in `cancel` locks only the bookings row, not the joined calendar rows; (4) the `$1::bigint IS NULL OR b.house_id = $1` pattern mirrors the `$2::date IS NULL OR date >= $2` pattern from Calendar for optional filter parameters in a single `query!` call.
 
 **Open issues / reminders:** None. Phase 2 is now complete — all domain vertical slices (Countries, Managers, Persons, Addresses, Houses, Calendar, Bookings) are implemented.
+
+---
+
+### Step 15 — OpenAPI / Swagger UI (2026-05-07)
+
+**Implemented:** Compile-time-generated OpenAPI 3 spec via `utoipa`, served alongside an interactive Swagger UI:
+
+- `Cargo.toml` — added `utoipa = "5"` (features: `actix_extras`, `chrono`, `decimal_float`) and `utoipa-swagger-ui = "9"` (feature: `actix-web`). Bumped from the plan's `utoipa = "4"` / `utoipa-swagger-ui = "8"` to the current stable releases (5.5 / 9.0). The `decimal_float` feature is required so `rust_decimal::Decimal` is rendered as a JSON number, matching our `serde-with-float` choice in Step 13.
+- All model structs and enums got `#[derive(ToSchema)]`: `Country`, `CreateCountryRequest`, `UpdateCountryRequest`, `Manager`, `CreateManagerRequest`, `UpdateManagerRequest`, `Person`, `CreatePersonRequest`, `UpdatePersonRequest`, `Address`, `CreateAddressRequest`, `UpdateAddressRequest`, `House`, `CreateHouseRequest`, `UpdateHouseRequest`, `CalendarStatus`, `CalendarEntry`, `CreateCalendarRequest`, `UpdateCalendarPriceRequest`, `BookingStatus`, `BookingHouse`, `BookingPerson`, `Booking`, `CreateBookingRequest`, `RecordPaymentRequest`.
+- Every domain handler (and the `/health` handler) was annotated with `#[utoipa::path(...)]` documenting method, path, tag, path/query parameters, request body, and the success + key error response codes (404, 409, 422 as applicable). Tags: `health`, `countries`, `managers`, `persons`, `addresses`, `houses`, `calendar`, `bookings`.
+- Created `src/openapi.rs` exposing `pub struct ApiDoc;` with `#[derive(OpenApi)]` listing every annotated path and every schema. Title/description/version are set in the `info(...)` block.
+- `src/lib.rs` — registered `pub mod openapi`.
+- `src/main.rs` — built `ApiDoc::openapi()` once outside the `HttpServer::new` closure (so it is cloned per worker, not regenerated) and mounted it via `SwaggerUi::new("/swagger-ui/{_:.*}").url("/api-docs/openapi.json", openapi.clone())`.
+
+**Endpoints added:**
+- `GET /api-docs/openapi.json` → full OpenAPI 3 JSON document
+- `GET /swagger-ui/` (and `/swagger-ui/index.html`) → interactive Swagger UI
+
+**Verified live:** `curl /api-docs/openapi.json` returns 17 paths and 25 component schemas. `curl /swagger-ui/index.html` returns the Swagger UI HTML. `cargo build`, `cargo clippy --all-targets`, and `cargo test --lib --bins` all pass.
+
+**Notes:**
+- I used the explicit fully-qualified type form `body = crate::models::xxx::Type` in `#[utoipa::path(...)]` rather than relying on a `use` import in each handler — this keeps the existing `use crate::models::xxx::{...}` lines minimal (only the request types we already imported) and avoids extra imports just for the doc macro.
+- `utoipa-swagger-ui` only registers `GET` for the static assets; `HEAD /swagger-ui/` returns 404 by design — not an issue.
+- The `actix_extras` feature lets utoipa parse actix-web extractor types in handler signatures, so `web::Data<...>` etc. are automatically excluded from documented parameters.
+
+**Open issues / reminders:** None.
