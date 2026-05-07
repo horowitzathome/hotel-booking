@@ -42,3 +42,5 @@ review `docs/decisions/` for prior reasoning.
 ### Codings instructions
 
 Follow the implementation plan documented in file docs/implementation_plan.md. For each coding session document what you have done as described in file docs/implementation_plan.md in chapter "Documentation of Implementation Sessions".
+
+If you need to do changes in the database schema, do them directly in the files migrations/0001_initial_schema.up.sql and migrations/0001_initial_schema.down.sql, since we are in development mode. In this case run first 'just db-migrate-revert' and then modify the schema files. 

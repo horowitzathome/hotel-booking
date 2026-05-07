@@ -1,10 +1,12 @@
 mod common;
 
+use std::result;
+
 use chrono::NaiveDate;
-use claude_test::errors::AppError;
 use claude_test::models::booking::{CreateBookingRequest, RecordPaymentRequest};
 use claude_test::models::calendar::CreateCalendarRequest;
 use claude_test::services::{booking as booking_svc, calendar as cal_svc};
+use claude_test::{errors::AppError, models::booking::Booking};
 use rust_decimal::Decimal;
 use sqlx::PgPool;
 
@@ -40,14 +42,24 @@ async fn booking_create_flips_days_to_rented(pool: PgPool) {
 
     booking_svc::create(
         &pool,
-        &CreateBookingRequest { house_id, person_id, from: d("2024-06-10"), to: d("2024-06-12") },
+        &CreateBookingRequest {
+            house_id,
+            person_id,
+            from: d("2024-06-10"),
+            to: d("2024-06-12"),
+        },
     )
     .await
     .unwrap();
 
-    let entries = cal_svc::list(&pool, house_id, Some(d("2024-06-10")), Some(d("2024-06-12")))
-        .await
-        .unwrap();
+    let entries = cal_svc::list(
+        &pool,
+        house_id,
+        Some(d("2024-06-10")),
+        Some(d("2024-06-12")),
+    )
+    .await
+    .unwrap();
     assert!(entries.iter().all(|e| e.status == "Rented"));
 }
 
@@ -75,7 +87,12 @@ async fn booking_create_returns_expected_total_price(pool: PgPool) {
 
     let booking = booking_svc::create(
         &pool,
-        &CreateBookingRequest { house_id, person_id, from: d("2024-06-01"), to: d("2024-06-03") },
+        &CreateBookingRequest {
+            house_id,
+            person_id,
+            from: d("2024-06-01"),
+            to: d("2024-06-03"),
+        },
     )
     .await
     .unwrap();
@@ -133,7 +150,12 @@ async fn booking_create_fails_when_day_not_rentable(pool: PgPool) {
 
     let result = booking_svc::create(
         &pool,
-        &CreateBookingRequest { house_id, person_id, from: d("2024-07-01"), to: d("2024-07-05") },
+        &CreateBookingRequest {
+            house_id,
+            person_id,
+            from: d("2024-07-01"),
+            to: d("2024-07-05"),
+        },
     )
     .await;
 
@@ -168,7 +190,12 @@ async fn booking_create_fails_when_entries_missing(pool: PgPool) {
 
     let result = booking_svc::create(
         &pool,
-        &CreateBookingRequest { house_id, person_id, from: d("2024-08-01"), to: d("2024-08-05") },
+        &CreateBookingRequest {
+            house_id,
+            person_id,
+            from: d("2024-08-01"),
+            to: d("2024-08-05"),
+        },
     )
     .await;
 
@@ -202,16 +229,26 @@ async fn booking_cancel_flips_days_back_to_rentable(pool: PgPool) {
 
     let booking = booking_svc::create(
         &pool,
-        &CreateBookingRequest { house_id, person_id, from: d("2024-09-01"), to: d("2024-09-03") },
+        &CreateBookingRequest {
+            house_id,
+            person_id,
+            from: d("2024-09-01"),
+            to: d("2024-09-03"),
+        },
     )
     .await
     .unwrap();
 
     booking_svc::cancel(&pool, booking.id).await.unwrap();
 
-    let entries = cal_svc::list(&pool, house_id, Some(d("2024-09-01")), Some(d("2024-09-03")))
-        .await
-        .unwrap();
+    let entries = cal_svc::list(
+        &pool,
+        house_id,
+        Some(d("2024-09-01")),
+        Some(d("2024-09-03")),
+    )
+    .await
+    .unwrap();
     assert!(entries.iter().all(|e| e.status == "Rentable"));
 }
 
@@ -239,7 +276,12 @@ async fn booking_cancel_fails_when_already_cancelled(pool: PgPool) {
 
     let booking = booking_svc::create(
         &pool,
-        &CreateBookingRequest { house_id, person_id, from: d("2024-10-01"), to: d("2024-10-02") },
+        &CreateBookingRequest {
+            house_id,
+            person_id,
+            from: d("2024-10-01"),
+            to: d("2024-10-02"),
+        },
     )
     .await
     .unwrap();
@@ -277,7 +319,12 @@ async fn payment_fails_on_cancelled_booking(pool: PgPool) {
 
     let booking = booking_svc::create(
         &pool,
-        &CreateBookingRequest { house_id, person_id, from: d("2024-11-01"), to: d("2024-11-02") },
+        &CreateBookingRequest {
+            house_id,
+            person_id,
+            from: d("2024-11-01"),
+            to: d("2024-11-02"),
+        },
     )
     .await
     .unwrap();
@@ -287,7 +334,10 @@ async fn payment_fails_on_cancelled_booking(pool: PgPool) {
     let result = booking_svc::record_payment(
         &pool,
         booking.id,
-        &RecordPaymentRequest { paid_at: d("2024-11-01"), total_paid: price(20000) },
+        &RecordPaymentRequest {
+            paid_at: d("2024-11-01"),
+            total_paid: price(20000),
+        },
     )
     .await;
 
@@ -295,4 +345,64 @@ async fn payment_fails_on_cancelled_booking(pool: PgPool) {
         matches!(result, Err(AppError::UnprocessableEntity(_))),
         "expected UnprocessableEntity, got {result:?}"
     );
+}
+
+// ---------------------------------------------------------------------------
+// record_payment: do a successful payment
+// ---------------------------------------------------------------------------
+
+#[sqlx::test(migrations = "./migrations")]
+async fn payment_successful(pool: PgPool) {
+    let house_id = common::create_test_house(&pool).await;
+    let person_id = common::create_test_person(&pool).await;
+
+    let from = d("2024-11-01");
+    let to = d("2024-11-02");
+
+    cal_svc::create(
+        &pool,
+        house_id,
+        &CreateCalendarRequest {
+            from,
+            to,
+            status: "Rentable".into(),
+            price: price(10000),
+        },
+    )
+    .await
+    .unwrap();
+
+    let booking = booking_svc::create(
+        &pool,
+        &CreateBookingRequest {
+            house_id,
+            person_id,
+            from,
+            to,
+        },
+    )
+    .await
+    .unwrap();
+
+    let price = price(20000);
+
+    let result = booking_svc::record_payment(
+        &pool,
+        booking.id,
+        &RecordPaymentRequest {
+            paid_at: from,
+            total_paid: price,
+        },
+    )
+    .await;
+
+    assert!(result.is_ok());
+
+    let booking = result.unwrap();
+    assert!(booking.person.id == person_id);
+    assert!(booking.total_paid.unwrap() == price);
+    assert!(booking.from == from);
+    assert!(booking.to == to);
+    assert!(booking.house.id == house_id);
+    assert!(booking.status == "Active");
 }

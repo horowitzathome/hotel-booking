@@ -171,4 +171,7 @@ async fn delete_unboooked_entries_succeeds(pool: PgPool) {
 
     let result = cal_svc::delete(&pool, house_id, d("2024-09-01"), d("2024-09-05")).await;
     assert!(result.is_ok());
+
+    // Keep DB
+    // assert!(false, "keep DB");
 }
