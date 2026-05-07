@@ -77,6 +77,10 @@ test-mod mod:
     cargo test {{ mod }}
 
 # Run clippy then all tests
+build: 
+    cargo build
+
+# Run clippy then all tests
 check: lint test
 
 # Run clippy

@@ -3,7 +3,7 @@ mod common;
 use chrono::NaiveDate;
 use claude_test::errors::AppError;
 use claude_test::models::booking::CreateBookingRequest;
-use claude_test::models::calendar::CreateCalendarRequest;
+use claude_test::models::calendar::{CalendarStatus, CreateCalendarRequest};
 use claude_test::services::{booking as booking_svc, calendar as cal_svc};
 use rust_decimal::Decimal;
 use sqlx::PgPool;
@@ -27,7 +27,7 @@ async fn create_skips_existing_entries(pool: PgPool) {
     let req1 = CreateCalendarRequest {
         from: d("2024-07-01"),
         to: d("2024-07-05"),
-        status: "Rentable".into(),
+        status: CalendarStatus::Rentable,
         price: price(10000),
     };
     let first = cal_svc::create(&pool, house_id, &req1).await.unwrap();
@@ -37,7 +37,7 @@ async fn create_skips_existing_entries(pool: PgPool) {
     let req2 = CreateCalendarRequest {
         from: d("2024-07-03"),
         to: d("2024-07-07"),
-        status: "Rentable".into(),
+        status: CalendarStatus::Rentable,
         price: price(12000),
     };
     let second = cal_svc::create(&pool, house_id, &req2).await.unwrap();
@@ -57,7 +57,7 @@ async fn create_fully_overlapping_range_returns_empty(pool: PgPool) {
     let req = CreateCalendarRequest {
         from: d("2024-08-01"),
         to: d("2024-08-03"),
-        status: "NotRentable".into(),
+        status: CalendarStatus::NotRentable,
         price: price(5000),
     };
     cal_svc::create(&pool, house_id, &req).await.unwrap();
@@ -81,7 +81,7 @@ async fn delete_blocked_by_active_booking(pool: PgPool) {
         &CreateCalendarRequest {
             from: d("2024-07-01"),
             to: d("2024-07-10"),
-            status: "Rentable".into(),
+            status: CalendarStatus::Rentable,
             price: price(10000),
         },
     )
@@ -123,7 +123,7 @@ async fn delete_succeeds_after_booking_cancelled(pool: PgPool) {
         &CreateCalendarRequest {
             from: d("2024-07-01"),
             to: d("2024-07-05"),
-            status: "Rentable".into(),
+            status: CalendarStatus::Rentable,
             price: price(10000),
         },
     )
@@ -162,7 +162,7 @@ async fn delete_unboooked_entries_succeeds(pool: PgPool) {
         &CreateCalendarRequest {
             from: d("2024-09-01"),
             to: d("2024-09-05"),
-            status: "NotRentable".into(),
+            status: CalendarStatus::NotRentable,
             price: price(8000),
         },
     )

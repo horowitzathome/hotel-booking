@@ -1,12 +1,10 @@
 mod common;
 
-use std::result;
-
 use chrono::NaiveDate;
-use claude_test::models::booking::{CreateBookingRequest, RecordPaymentRequest};
-use claude_test::models::calendar::CreateCalendarRequest;
+use claude_test::errors::AppError;
+use claude_test::models::booking::{BookingStatus, CreateBookingRequest, RecordPaymentRequest};
+use claude_test::models::calendar::{CalendarStatus, CreateCalendarRequest};
 use claude_test::services::{booking as booking_svc, calendar as cal_svc};
-use claude_test::{errors::AppError, models::booking::Booking};
 use rust_decimal::Decimal;
 use sqlx::PgPool;
 
@@ -33,7 +31,7 @@ async fn booking_create_flips_days_to_rented(pool: PgPool) {
         &CreateCalendarRequest {
             from: d("2024-06-10"),
             to: d("2024-06-12"),
-            status: "Rentable".into(),
+            status: CalendarStatus::Rentable,
             price: price(10000),
         },
     )
@@ -60,7 +58,7 @@ async fn booking_create_flips_days_to_rented(pool: PgPool) {
     )
     .await
     .unwrap();
-    assert!(entries.iter().all(|e| e.status == "Rented"));
+    assert!(entries.iter().all(|e| e.status == CalendarStatus::Rented));
 }
 
 // ---------------------------------------------------------------------------
@@ -78,7 +76,7 @@ async fn booking_create_returns_expected_total_price(pool: PgPool) {
         &CreateCalendarRequest {
             from: d("2024-06-01"),
             to: d("2024-06-03"),
-            status: "Rentable".into(),
+            status: CalendarStatus::Rentable,
             price: price(15000), // 150.00 per day
         },
     )
@@ -117,7 +115,7 @@ async fn booking_create_fails_when_day_not_rentable(pool: PgPool) {
         &CreateCalendarRequest {
             from: d("2024-07-01"),
             to: d("2024-07-02"),
-            status: "Rentable".into(),
+            status: CalendarStatus::Rentable,
             price: price(10000),
         },
     )
@@ -129,7 +127,7 @@ async fn booking_create_fails_when_day_not_rentable(pool: PgPool) {
         &CreateCalendarRequest {
             from: d("2024-07-03"),
             to: d("2024-07-03"),
-            status: "NotRentable".into(),
+            status: CalendarStatus::NotRentable,
             price: price(10000),
         },
     )
@@ -141,7 +139,7 @@ async fn booking_create_fails_when_day_not_rentable(pool: PgPool) {
         &CreateCalendarRequest {
             from: d("2024-07-04"),
             to: d("2024-07-05"),
-            status: "Rentable".into(),
+            status: CalendarStatus::Rentable,
             price: price(10000),
         },
     )
@@ -181,7 +179,7 @@ async fn booking_create_fails_when_entries_missing(pool: PgPool) {
         &CreateCalendarRequest {
             from: d("2024-08-01"),
             to: d("2024-08-03"),
-            status: "Rentable".into(),
+            status: CalendarStatus::Rentable,
             price: price(10000),
         },
     )
@@ -220,7 +218,7 @@ async fn booking_cancel_flips_days_back_to_rentable(pool: PgPool) {
         &CreateCalendarRequest {
             from: d("2024-09-01"),
             to: d("2024-09-03"),
-            status: "Rentable".into(),
+            status: CalendarStatus::Rentable,
             price: price(10000),
         },
     )
@@ -249,7 +247,7 @@ async fn booking_cancel_flips_days_back_to_rentable(pool: PgPool) {
     )
     .await
     .unwrap();
-    assert!(entries.iter().all(|e| e.status == "Rentable"));
+    assert!(entries.iter().all(|e| e.status == CalendarStatus::Rentable));
 }
 
 // ---------------------------------------------------------------------------
@@ -267,7 +265,7 @@ async fn booking_cancel_fails_when_already_cancelled(pool: PgPool) {
         &CreateCalendarRequest {
             from: d("2024-10-01"),
             to: d("2024-10-02"),
-            status: "Rentable".into(),
+            status: CalendarStatus::Rentable,
             price: price(10000),
         },
     )
@@ -310,7 +308,7 @@ async fn payment_fails_on_cancelled_booking(pool: PgPool) {
         &CreateCalendarRequest {
             from: d("2024-11-01"),
             to: d("2024-11-02"),
-            status: "Rentable".into(),
+            status: CalendarStatus::Rentable,
             price: price(10000),
         },
     )
@@ -365,7 +363,7 @@ async fn payment_successful(pool: PgPool) {
         &CreateCalendarRequest {
             from,
             to,
-            status: "Rentable".into(),
+            status: CalendarStatus::Rentable,
             price: price(10000),
         },
     )
@@ -404,5 +402,5 @@ async fn payment_successful(pool: PgPool) {
     assert!(booking.from == from);
     assert!(booking.to == to);
     assert!(booking.house.id == house_id);
-    assert!(booking.status == "Active");
+    assert!(booking.status == BookingStatus::Active);
 }

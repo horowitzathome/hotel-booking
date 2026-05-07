@@ -2,7 +2,10 @@ use rust_decimal::Decimal;
 use sqlx::PgPool;
 
 use crate::errors::AppError;
-use crate::models::booking::{Booking, BookingHouse, BookingPerson, CreateBookingRequest, RecordPaymentRequest};
+use crate::models::booking::{
+    Booking, BookingHouse, BookingPerson, BookingStatus, CreateBookingRequest, RecordPaymentRequest,
+};
+use crate::models::calendar::CalendarStatus;
 
 pub async fn find_all(
     pool: &PgPool,
@@ -20,7 +23,7 @@ pub async fn find_all(
             p.last_name      AS person_last_name,
             b.from_date,
             b.to_date,
-            b.status,
+            b.status         AS "status: BookingStatus",
             b.paid_at,
             b.total_paid
         FROM bookings b
@@ -41,7 +44,10 @@ pub async fn find_all(
         .into_iter()
         .map(|r| Booking {
             id: r.id,
-            house: BookingHouse { id: r.house_id, name: r.house_name },
+            house: BookingHouse {
+                id: r.house_id,
+                name: r.house_name,
+            },
             person: BookingPerson {
                 id: r.person_id,
                 first_name: r.person_first_name,
@@ -69,7 +75,7 @@ pub async fn find_by_id(pool: &PgPool, id: i64) -> Result<Booking, AppError> {
             p.last_name      AS person_last_name,
             b.from_date,
             b.to_date,
-            b.status,
+            b.status         AS "status: BookingStatus",
             b.paid_at,
             b.total_paid
         FROM bookings b
@@ -88,7 +94,10 @@ pub async fn find_by_id(pool: &PgPool, id: i64) -> Result<Booking, AppError> {
 
     Ok(Booking {
         id: r.id,
-        house: BookingHouse { id: r.house_id, name: r.house_name },
+        house: BookingHouse {
+            id: r.house_id,
+            name: r.house_name,
+        },
         person: BookingPerson {
             id: r.person_id,
             first_name: r.person_first_name,
@@ -111,7 +120,7 @@ pub async fn create(
 
     let entries = sqlx::query!(
         r#"
-        SELECT id, date, status, price
+        SELECT id, date, status AS "status: CalendarStatus", price
         FROM calendar
         WHERE house_id = $1 AND date BETWEEN $2 AND $3
         ORDER BY date
@@ -132,7 +141,7 @@ pub async fn create(
         ));
     }
 
-    if entries.iter().any(|e| e.status != "Rentable") {
+    if entries.iter().any(|e| e.status != CalendarStatus::Rentable) {
         return Err(AppError::UnprocessableEntity(
             "all days in range must be in status 'Rentable'".into(),
         ));
@@ -180,7 +189,7 @@ pub async fn cancel(pool: &PgPool, id: i64) -> Result<Booking, AppError> {
 
     let row = sqlx::query!(
         r#"
-        SELECT status, house_id, from_date, to_date
+        SELECT status AS "status: BookingStatus", house_id, from_date, to_date
         FROM bookings
         WHERE id = $1
         FOR UPDATE
@@ -194,7 +203,7 @@ pub async fn cancel(pool: &PgPool, id: i64) -> Result<Booking, AppError> {
         other => AppError::from(other),
     })?;
 
-    if row.status == "Cancelled" {
+    if row.status == BookingStatus::Cancelled {
         return Err(AppError::UnprocessableEntity(
             "booking is already cancelled".into(),
         ));
@@ -229,7 +238,7 @@ pub async fn record_payment(
     req: &RecordPaymentRequest,
 ) -> Result<Booking, AppError> {
     let status = sqlx::query_scalar!(
-        "SELECT status FROM bookings WHERE id = $1",
+        r#"SELECT status AS "status: BookingStatus" FROM bookings WHERE id = $1"#,
         id,
     )
     .fetch_one(pool)
@@ -239,7 +248,7 @@ pub async fn record_payment(
         other => AppError::from(other),
     })?;
 
-    if status == "Cancelled" {
+    if status == BookingStatus::Cancelled {
         return Err(AppError::UnprocessableEntity(
             "cannot record payment for a cancelled booking".into(),
         ));

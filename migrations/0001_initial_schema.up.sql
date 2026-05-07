@@ -2,6 +2,10 @@
 -- 0001 — initial schema
 -- =============================================================================
 
+-- Enum types ---------------------------------------------------------------
+CREATE TYPE calendar_status AS ENUM ('NotRentable', 'Rentable', 'Rented');
+CREATE TYPE booking_status  AS ENUM ('Active', 'Cancelled');
+
 -- Countries ----------------------------------------------------------------
 CREATE TABLE countries (
     id       BIGSERIAL   PRIMARY KEY,
@@ -56,10 +60,9 @@ CREATE TABLE calendar (
     id       BIGSERIAL      PRIMARY KEY,
     house_id BIGINT         NOT NULL REFERENCES houses (id),
     date     DATE           NOT NULL,
-    status   VARCHAR(20)    NOT NULL DEFAULT 'NotRentable',
+    status   calendar_status NOT NULL DEFAULT 'NotRentable',
     price    NUMERIC(10, 2) NOT NULL,
-    CONSTRAINT uq_calendar_house_date UNIQUE (house_id, date),
-    CONSTRAINT ck_calendar_status     CHECK  (status IN ('NotRentable', 'Rentable', 'Rented'))
+    CONSTRAINT uq_calendar_house_date UNIQUE (house_id, date)
 );
 
 -- Bookings ----------------------------------------------------------------
@@ -71,10 +74,9 @@ CREATE TABLE bookings (
     to_calendar_id   BIGINT         REFERENCES calendar (id) ON DELETE SET NULL,
     from_date        DATE           NOT NULL,
     to_date          DATE           NOT NULL,
-    status           VARCHAR(20)    NOT NULL DEFAULT 'Active',
+    status           booking_status NOT NULL DEFAULT 'Active',
     paid_at          DATE,
     total_paid       NUMERIC(10, 2),
-    CONSTRAINT ck_bookings_status  CHECK (status IN ('Active', 'Cancelled')),
     -- paid_at and total_paid must both be set or both be null
     CONSTRAINT ck_bookings_payment CHECK (
         (paid_at IS NULL) = (total_paid IS NULL)

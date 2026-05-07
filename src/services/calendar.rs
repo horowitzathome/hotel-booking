@@ -2,20 +2,14 @@ use chrono::NaiveDate;
 use sqlx::PgPool;
 
 use crate::errors::AppError;
-use crate::models::calendar::{CalendarEntry, CreateCalendarRequest, UpdateCalendarPriceRequest};
+use crate::models::calendar::{CalendarEntry, CalendarStatus, CreateCalendarRequest, UpdateCalendarPriceRequest};
 use crate::repositories::calendar as repo;
 
-fn validate_create_status(status: &str) -> Result<(), AppError> {
-    if status == "Rented" {
+fn validate_create_status(status: CalendarStatus) -> Result<(), AppError> {
+    if status == CalendarStatus::Rented {
         return Err(AppError::UnprocessableEntity(
             "status 'Rented' cannot be set via calendar endpoints".into(),
         ));
-    }
-    if !matches!(status, "NotRentable" | "Rentable") {
-        return Err(AppError::UnprocessableEntity(format!(
-            "invalid status '{}'; must be 'NotRentable' or 'Rentable'",
-            status
-        )));
     }
     Ok(())
 }
@@ -47,7 +41,7 @@ pub async fn create(
     house_id: i64,
     req: &CreateCalendarRequest,
 ) -> Result<Vec<CalendarEntry>, AppError> {
-    validate_create_status(&req.status)?;
+    validate_create_status(req.status)?;
     validate_date_range(req.from, req.to)?;
     repo::create(pool, house_id, req).await
 }
@@ -82,23 +76,15 @@ mod tests {
     #[test]
     fn create_rejects_rented_status() {
         assert!(matches!(
-            validate_create_status("Rented"),
-            Err(AppError::UnprocessableEntity(_))
-        ));
-    }
-
-    #[test]
-    fn create_rejects_unknown_status() {
-        assert!(matches!(
-            validate_create_status("Active"),
+            validate_create_status(CalendarStatus::Rented),
             Err(AppError::UnprocessableEntity(_))
         ));
     }
 
     #[test]
     fn create_accepts_valid_statuses() {
-        assert!(validate_create_status("Rentable").is_ok());
-        assert!(validate_create_status("NotRentable").is_ok());
+        assert!(validate_create_status(CalendarStatus::Rentable).is_ok());
+        assert!(validate_create_status(CalendarStatus::NotRentable).is_ok());
     }
 
     #[test]

@@ -2,7 +2,7 @@ use chrono::{Duration, NaiveDate};
 use sqlx::PgPool;
 
 use crate::errors::AppError;
-use crate::models::calendar::{CalendarEntry, CreateCalendarRequest, UpdateCalendarPriceRequest};
+use crate::models::calendar::{CalendarEntry, CalendarStatus, CreateCalendarRequest, UpdateCalendarPriceRequest};
 
 pub async fn find_all(
     pool: &PgPool,
@@ -12,7 +12,7 @@ pub async fn find_all(
 ) -> Result<Vec<CalendarEntry>, AppError> {
     let rows = sqlx::query!(
         r#"
-        SELECT id, date, status, price
+        SELECT id, date, status AS "status: CalendarStatus", price
         FROM calendar
         WHERE house_id = $1
           AND ($2::date IS NULL OR date >= $2)
@@ -40,7 +40,7 @@ pub async fn find_all(
 
 pub async fn find_by_id(pool: &PgPool, house_id: i64, id: i64) -> Result<CalendarEntry, AppError> {
     let row = sqlx::query!(
-        "SELECT id, date, status, price FROM calendar WHERE id = $1 AND house_id = $2",
+        r#"SELECT id, date, status AS "status: CalendarStatus", price FROM calendar WHERE id = $1 AND house_id = $2"#,
         id,
         house_id,
     )
@@ -76,11 +76,11 @@ pub async fn create(
             INSERT INTO calendar (house_id, date, status, price)
             VALUES ($1, $2, $3, $4)
             ON CONFLICT (house_id, date) DO NOTHING
-            RETURNING id, date, status, price
+            RETURNING id, date, status AS "status: CalendarStatus", price
             "#,
             house_id,
             date,
-            req.status.as_str(),
+            req.status as CalendarStatus,
             req.price,
         )
         .fetch_optional(&mut *tx)
@@ -113,7 +113,7 @@ pub async fn update_price(
         UPDATE calendar
         SET price = $1
         WHERE house_id = $2 AND date BETWEEN $3 AND $4
-        RETURNING id, date, status, price
+        RETURNING id, date, status AS "status: CalendarStatus", price
         "#,
         req.price,
         house_id,

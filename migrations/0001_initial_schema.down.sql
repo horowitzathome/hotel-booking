@@ -10,3 +10,6 @@ DROP TABLE IF EXISTS persons;
 DROP TABLE IF EXISTS managers;
 DROP TABLE IF EXISTS addresses;
 DROP TABLE IF EXISTS countries;
+
+DROP TYPE IF EXISTS booking_status;
+DROP TYPE IF EXISTS calendar_status;

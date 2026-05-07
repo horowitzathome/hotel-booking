@@ -2,6 +2,13 @@ use chrono::NaiveDate;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(type_name = "booking_status")]
+pub enum BookingStatus {
+    Active,
+    Cancelled,
+}
+
 #[derive(Debug, Serialize)]
 pub struct BookingHouse {
     pub id: i64,
@@ -22,7 +29,7 @@ pub struct Booking {
     pub person: BookingPerson,
     pub from: NaiveDate,
     pub to: NaiveDate,
-    pub status: String,
+    pub status: BookingStatus,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expected_total_price: Option<Decimal>,
     pub paid_at: Option<NaiveDate>,
