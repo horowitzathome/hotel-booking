@@ -85,6 +85,8 @@ async fn main() -> Result<()> {
 
     let prometheus = PrometheusMetricsBuilder::new("api")
         .endpoint("/metrics")
+        .exclude_regex(r"^/swagger-ui(/.*)?$")
+        .exclude("/api-docs/openapi.json")
         .build()
         .expect("failed to build prometheus metrics");
 
