@@ -33,6 +33,7 @@ Use especially the rust-skills plugin and its skills. If you can not find instru
 - Past architectural decisions: @docs/decisions/
 - Glossary of domain terms: @docs/glossary.md
 - REST API surface (URLs, methods, request/response shapes): @docs/api.md
+- Operations / observability runbook (logs, metrics, traces): @docs/operation_infos.md
 
 ### How to use the docs
 When working on a specific domain (billing, auth, inventory), read the

@@ -42,3 +42,9 @@ rust_decimal = { version = "1", features = ["serde-with-float"] }
 # OpenAPI / Swagger UI
 utoipa = { version = "5", features = ["actix_extras", "chrono", "decimal_float"] }
 utoipa-swagger-ui = { version = "9", features = ["actix-web"] }
+
+# Distributed tracing (OTLP → Jaeger / Tempo)
+opentelemetry = { version = "0.31", default-features = false, features = ["trace"] }
+opentelemetry_sdk = { version = "0.31", default-features = false, features = ["trace", "rt-tokio"] }
+opentelemetry-otlp = { version = "0.31", default-features = false, features = ["grpc-tonic", "trace"] }
+tracing-opentelemetry = "0.32"

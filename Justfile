@@ -90,3 +90,34 @@ lint:
 # Format code
 fmt:
     cargo fmt
+
+# --- Observability: Jaeger (OTLP traces) ---
+
+# Start Jaeger all-in-one (UI on :16686, OTLP/gRPC on :4317, OTLP/HTTP on :4318)
+obs-up:
+    docker run -d --name rental-jaeger \
+        -p 16686:16686 \
+        -p 4317:4317 \
+        -p 4318:4318 \
+        jaegertracing/all-in-one:1.62 \
+    || docker start rental-jaeger
+
+# Stop and remove Jaeger
+obs-down:
+    docker stop rental-jaeger
+    docker rm rental-jaeger
+
+# Tail Jaeger container logs
+obs-logs:
+    docker logs -f rental-jaeger
+
+# CURL Test Commands
+
+# API Health
+api-health:
+    curl -v -i localhost:8080/health
+
+# Generate some traffic
+api-traffic:    
+    curl -v -i http://localhost:8080/api/v1/bookings
+    curl -v -i http://localhost:8080/api/v1/countries

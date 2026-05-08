@@ -388,3 +388,61 @@ Here a list of completed steps. For each step this is listed:
 - The `actix_extras` feature lets utoipa parse actix-web extractor types in handler signatures, so `web::Data<...>` etc. are automatically excluded from documented parameters.
 
 **Open issues / reminders:** None.
+
+---
+
+### Step 16 — Tracing span enrichment + `x-request-id` response header (2026-05-07)
+
+**Implemented:** Per-request id is already produced by `tracing-actix-web`'s `DefaultRootSpanBuilder` — the existing `TracingLogger::default()` middleware opens a root span on every request and populates it with `request_id` (UUID), `http.method`, `http.route`, `http.status_code`, `http.client_ip`, `http.user_agent`, `http.flavor`, `http.scheme`, `http.host`, `http.target`, `otel.kind`, `otel.name`, `otel.status_code`, and (on errors) `exception.message` / `exception.details`. Anything emitted via `tracing::info!` (etc.) inside a handler inherits this span, so log lines and downstream spans automatically carry the request id.
+
+The new piece is propagation back to the client: a small `wrap_fn` middleware reads the `RequestId` extension that `TracingLogger` injects on the request, and writes it to the response as `x-request-id`. This lets a caller correlate a response with the structured logs without parsing the body.
+
+- `src/main.rs` — added imports `actix_web::dev::Service`, `actix_web::HttpMessage`, `actix_web::http::header::{HeaderName, HeaderValue}`, and `tracing_actix_web::RequestId`. Inserted a `.wrap_fn(...)` between the existing `prometheus` and `TracingLogger::default()` wraps.
+- Middleware ordering (registration → wrapping):
+  - `.wrap(prometheus.clone())` — innermost (registered first)
+  - `.wrap_fn(...)` — middle, reads `RequestId` from request extensions on the way in, sets `x-request-id` header on the way out
+  - `.wrap(TracingLogger::default())` — outermost (registered last); runs first on each incoming request, so the `RequestId` is already in the extensions by the time `wrap_fn` sees it
+
+**Verified live:**
+- `curl -i /health` → response includes `x-request-id: 22799ad0-2fd0-47ed-aa7b-b02735c3ac79`
+- `curl -i /api/v1/countries` → response includes `x-request-id: 9d252bc8-05fc-4eff-9aaa-96d4dcbe6eee`
+- `cargo build` and `cargo clippy --all-targets` succeed without warnings; `cargo test --lib --bins` passes.
+
+**Notes:**
+- Used `format!("{id}")` rather than `id.to_string()` to avoid a closure-context type-inference error on `to_string` inside the `wrap_fn` body.
+- Used the let-chain form `if let Some(id) = ... && let Ok(value) = ...` to satisfy clippy's `collapsible_if` lint and keep the middleware body flat.
+- Did *not* honour an incoming `x-request-id` header — every request currently gets a freshly generated UUID. If the service is ever placed behind a gateway that already supplies one, swap `DefaultRootSpanBuilder` for a small custom `RootSpanBuilder` that reads the inbound header. Not required for this step.
+
+**Open issues / reminders:** None.
+
+---
+
+### Step 16 (extension) — Distributed tracing via OpenTelemetry / Jaeger (2026-05-07)
+
+**Implemented:** Optional OTLP/gRPC span export so request traces can be viewed as a flame graph in Jaeger / Tempo, with nested spans for the service and repository layers. Enabled by setting `OTEL_EXPORTER_OTLP_ENDPOINT`; with the var unset the exporter is not started and the app behaves exactly as before.
+
+- `Cargo.toml` — added `opentelemetry`, `opentelemetry_sdk` (feature `rt-tokio`), `opentelemetry-otlp` (features `grpc-tonic`, `trace`), and `tracing-opentelemetry`. All four pinned with `default-features = false` where applicable to drop the metrics/logs/reqwest/internal-logs features we don't use, which also avoids a feedback loop where the SDK's internal-logs would round-trip back through the tracing subscriber.
+- `src/main.rs` — `init_tracing` was rewritten to compose layers via `tracing_subscriber::registry()`:
+  - One `EnvFilter` at the registry level (so it applies to *all* layers including OTel, not just stdout)
+  - One boxed `fmt` layer (pretty in dev, JSON in prod)
+  - An `Option<OpenTelemetryLayer>` — `Some` when `OTEL_EXPORTER_OTLP_ENDPOINT` is set, `None` otherwise
+  - The fn returns the `SdkTracerProvider` so `main` can call `provider.shutdown()` after the server stops, flushing the final batch of spans
+- `src/services/booking.rs` and `src/repositories/booking.rs` — added `#[tracing::instrument(skip(pool, ...), fields(layer = "service" | "repository"))]` to every public function. This is what produces the nested span tree (root HTTP span → `list` → `find_all`, etc.) — without it, OTel only sees the single root span from `tracing-actix-web`. Other domains can be instrumented the same way later.
+- `Justfile` — added `obs-up`, `obs-down`, `obs-logs` for a local Jaeger all-in-one container (UI on :16686, OTLP/gRPC on :4317, OTLP/HTTP on :4318).
+- `.env` — added a commented `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317` example, and broadened the default `RUST_LOG` to silence `h2`, `hyper`, `tonic`, `tower`, `reqwest` (otherwise the OTel gRPC client's own h2 internals show up as spans in Jaeger).
+- `docs/operation_infos.md` — full ops runbook covering logs, metrics, traces, sampling, and a correlation cheatsheet. `CLAUDE.md` updated to reference it.
+
+**Verified live:**
+- `just obs-up` → Jaeger reachable at `http://localhost:16686`
+- `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 cargo run` → startup log shows `otlp=true`
+- `curl /api/v1/bookings` → `curl http://localhost:16686/api/traces?service=rental-api` returns traces with the nested span set `['GET /api/v1/bookings', 'list', 'find_all']` — exactly the three-layer chain we wanted to see.
+- `cargo build` and `cargo clippy --all-targets` succeed without warnings; `cargo test --lib --bins` passes.
+
+**Notes:**
+- The `EnvFilter` had to live at the registry level (not as a per-layer `.with_filter`) so OTel sees the same filter as fmt. Required `.boxed()` on the fmt layer so its `S` parameter could be inferred to `Layered<EnvFilter, Registry>` rather than just `Registry` (the `Box::new(...)` form pinned `Registry` and broke the chain).
+- Without the `h2=off,tonic=off,...` filter, the very first request after enabling OTLP produced a flood of `reserve_capacity` / `try_assign_capacity` / `Prioritize::queue_frame` spans in Jaeger — those are the OTel exporter's *own* gRPC client emitting tracing spans for its internal flow control, which then go right back into the export pipeline. Filtering them out at the EnvFilter level fully fixes it.
+- The booking domain is fully instrumented as the demonstration; the other six domains (countries, managers, persons, addresses, houses, calendar) only get the root HTTP span until someone adds `#[tracing::instrument]` to their service / repository fns. Documented in `docs/operation_infos.md` so it's discoverable.
+
+**Open issues / reminders:**
+- No sampling configured — fine for dev, must be added at the OTel Collector (or via `Sampler::TraceIdRatioBased`) before high-traffic production use.
+- Other domains' instrumentation is pending; mechanical work (one attribute per public fn).

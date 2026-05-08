@@ -7,6 +7,7 @@ use crate::models::booking::{
 };
 use crate::models::calendar::CalendarStatus;
 
+#[tracing::instrument(skip(pool), fields(layer = "repository"))]
 pub async fn find_all(
     pool: &PgPool,
     house_id: Option<i64>,
@@ -63,6 +64,7 @@ pub async fn find_all(
         .collect())
 }
 
+#[tracing::instrument(skip(pool), fields(layer = "repository"))]
 pub async fn find_by_id(pool: &PgPool, id: i64) -> Result<Booking, AppError> {
     let r = sqlx::query!(
         r#"
@@ -112,6 +114,7 @@ pub async fn find_by_id(pool: &PgPool, id: i64) -> Result<Booking, AppError> {
     })
 }
 
+#[tracing::instrument(skip(pool, req), fields(layer = "repository", house_id = req.house_id, person_id = req.person_id))]
 pub async fn create(
     pool: &PgPool,
     req: &CreateBookingRequest,
@@ -184,6 +187,7 @@ pub async fn create(
     Ok((booking, expected_total_price))
 }
 
+#[tracing::instrument(skip(pool), fields(layer = "repository"))]
 pub async fn cancel(pool: &PgPool, id: i64) -> Result<Booking, AppError> {
     let mut tx = pool.begin().await.map_err(AppError::from)?;
 
@@ -232,6 +236,7 @@ pub async fn cancel(pool: &PgPool, id: i64) -> Result<Booking, AppError> {
     find_by_id(pool, id).await
 }
 
+#[tracing::instrument(skip(pool, req), fields(layer = "repository"))]
 pub async fn record_payment(
     pool: &PgPool,
     id: i64,
