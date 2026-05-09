@@ -174,7 +174,36 @@ docker-run:
 docker-size:
     docker images {{ image_name }}:{{ image_tag }}
 
-# CURL Test Commands
+# --- Seeder: bulk-load dummy data into the rental DB ---
+
+# Truncate all data tables (countries, addresses, managers, persons, houses, calendar, bookings)
+seed-reset:
+    cargo run --release -p seeder -- reset
+
+# Load full default volumes (the demo target: ~1k managers, 100k persons, 10k addresses, 10k houses)
+seed-load:
+    cargo run --release -p seeder -- load
+
+# Load a tiny dataset for fast iteration / smoke tests
+seed-load-small:
+    cargo run --release -p seeder -- load --small
+
+# Reset then load full volumes (the typical "fresh start")
+seed-fresh: seed-reset seed-load
+
+# Load only specific steps, e.g. `just seed-only houses,managers`
+seed-only steps:
+    cargo run --release -p seeder -- load --only {{ steps }}
+
+# Skip specific steps, e.g. `just seed-skip persons,managers`
+seed-skip steps:
+    cargo run --release -p seeder -- load --skip {{ steps }}
+
+# Print row counts per table
+seed-verify:
+    cargo run --release -p seeder -- verify
+
+# CURL Test Commandsjust 
 
 # API Health
 api-health:

@@ -2,6 +2,7 @@
 resolver = "3"
 members = [
     "crates/rental-api",
+    "crates/seeder",
 ]
 
 [workspace.package]
