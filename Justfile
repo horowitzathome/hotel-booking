@@ -115,6 +115,35 @@ obs-down:
 obs-logs:
     docker logs -f rental-jaeger
 
+# --- Compose: full local stack (app + Postgres + Jaeger + Loki + Promtail + Prometheus + Grafana) ---
+#
+# Conflicts with the standalone `just db-run` / `just obs-up` / `just docker-run` targets
+# because the container names overlap. Stop those first if needed.
+
+# Bring up the full stack, building the app image if it has changed
+compose-up:
+    docker compose up -d --build
+
+# Tail app logs
+compose-logs:
+    docker compose logs -f app
+
+# Tail logs for any service: `just compose-logs-svc svc=loki`
+compose-logs-svc svc:
+    docker compose logs -f {{ svc }}
+
+# Show running services
+compose-ps:
+    docker compose ps
+
+# Stop and remove containers (named volumes preserved — Postgres bind mount also preserved)
+compose-down:
+    docker compose down
+
+# Stop and remove containers AND wipe named volumes (DESTRUCTIVE — Loki/Prometheus/Grafana data lost)
+compose-nuke:
+    docker compose down -v
+
 # --- SQLx offline mode (required for Docker builds) ---
 
 # Regenerate .sqlx/ query metadata from the live DB.

@@ -74,7 +74,9 @@ Step 17: Input validation (validator crate, #[validate] on request structs)
 
 Step 18: Dockerfile (multi-stage with cargo-chef + distroless)
 
-Step 19: GitHub Actions CI pipeline
+Step 19: Setup a docker compose yaml file to spin up the database, the loki, promtail, grafana, openapi and the application itself. So everything which is needed to have the application and all supporting runtimes. 
+
+Step 20: GitHub Actions CI pipeline
 
 ## Suggested starting point
 
@@ -518,3 +520,48 @@ The new piece is propagation back to the client: a small `wrap_fn` middleware re
 - `.sqlx/` must be regenerated and committed whenever a `query!` / `query_as!` macro is added or changed; otherwise the Docker build fails. Add to PR review checklist.
 - The runtime image runs as `root` (uid 0) since scratch has no `/etc/passwd` and no `nonroot` user to switch to. For Kubernetes deployment, set `securityContext.runAsUser: 65532` and `runAsNonRoot: true` at the Pod level — that's the cleanest way to get a non-root identity without baking one into the image. Alternative: switch back to `gcr.io/distroless/static-debian12:nonroot` (the static variant — still works with musl binaries, ~6 MB overhead, brings a `nonroot` user with it).
 - Step 19 (GitHub Actions CI) and the planned Grafana / Loki / Promtail step build on this. With the binary now containerised, a unifying `docker-compose.yml` becomes natural — it can wire app + Postgres + Jaeger + (later) Loki + Grafana on a shared docker network without `host.docker.internal` workarounds.
+
+---
+
+### Step 19 — docker-compose.yml: full local stack (app + Postgres + Jaeger + Loki + Promtail + Prometheus + Grafana) (2026-05-09)
+
+**Implemented:** Single-command `docker compose up -d --build` brings up the entire backend plus its observability stack on one docker network. No more `host.docker.internal`, no more juggling `just db-run` + `just obs-up` + `cargo run`.
+
+- `docker-compose.yml` — seven services, all on the default compose network, addressable by service name:
+  - **postgres** (`postgres:18.3`) — reuses the existing `./database` host bind mount so dev data carries over from the standalone `just db-run` workflow. Has a `pg_isready` healthcheck so the app waits for it.
+  - **jaeger** (`jaegertracing/all-in-one:1.62.0`) — UI on :16686, OTLP/gRPC on :4317, OTLP/HTTP on :4318. `COLLECTOR_OTLP_ENABLED=true`.
+  - **loki** (`grafana/loki:3.2.1`) — log store, HTTP API on :3100, named volume `loki-data` for persistence.
+  - **promtail** (`grafana/promtail:3.2.1`) — log shipper. Discovers containers via the Docker socket, tails their JSON log files from `/var/lib/docker/containers`, pushes to Loki.
+  - **prometheus** (`prom/prometheus:v3.0.1`) — scrapes `app:8080/metrics` every 15 s, 7-day retention, named volume `prometheus-data`.
+  - **grafana** (`grafana/grafana:11.3.1`) — UI on :3000 with anonymous Admin (no login form for dev convenience). Datasources auto-provisioned from `observability/grafana/provisioning/datasources/datasources.yaml`.
+  - **app** (`rental-api:dev`, built via `build: .`) — env-injected `DATABASE_URL=postgres://rental:rental@postgres:5432/rental` and `OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317`. `depends_on: postgres (healthy)` + `jaeger (started)`.
+- `observability/loki/loki-config.yaml` — minimal Loki 3.x config: filesystem chunk storage under `common.storage.filesystem`, TSDB index, schema `v13`, allow_structured_metadata, analytics off.
+- `observability/promtail/promtail-config.yaml` — `docker_sd_configs` discovery + relabel to set `container` and `stream` labels. Pipeline: unwrap Docker's wrapping JSON envelope (`docker:` stage), then for `{container="rental-api"}` parse the inner production JSON and **lift `level` and `target` to Loki labels** so users can filter `{container="rental-api", level="ERROR"}` in Grafana.
+- `observability/prometheus/prometheus.yml` — single scrape job `rental-api` against `app:8080/metrics`, labelled `service=rental-api`.
+- `observability/grafana/provisioning/datasources/datasources.yaml` — three pre-configured datasources: Prometheus (default), Loki, Jaeger (uid `jaeger`). Loki has a `derivedFields` rule that turns any `request_id` UUID in a log line into a clickable link to the Jaeger datasource — wires up the log-to-trace correlation described in `docs/operation_infos.md`.
+- `Justfile` — five new targets: `compose-up`, `compose-down`, `compose-logs`, `compose-logs-svc svc=NAME`, `compose-ps`, `compose-nuke` (the destructive variant that wipes named volumes too).
+
+**Verified live (2026-05-09):**
+- `just compose-up` → all 7 containers healthy after ~10 s.
+- `curl http://localhost:8080/health` → 200, `x-request-id: f4862e51-…`
+- `curl http://localhost:8080/api/v1/countries` → 200, returns seeded country (the bind-mounted `./database` volume preserves the dev data from prior standalone runs).
+- `curl http://localhost:3100/loki/api/v1/labels` → `["container","level","service_name","stream","target"]` — confirms Promtail's relabel + JSON-parse pipeline produced the expected label set.
+- `curl 'http://localhost:3100/loki/api/v1/query_range?query={container="rental-api"}'` → returns the app's structured JSON log lines (`database pool created`, `database migrations applied`, `listening`, `starting service…`).
+- `curl http://localhost:9090/api/v1/targets` → `app:8080` target `up` under job `rental-api`.
+- `curl http://localhost:16686/api/services` → `["rental-api"]` (traces flowing).
+- `curl http://localhost:3000/api/datasources` (anonymous) → returns `[Jaeger, Loki, Prometheus]`, all proxied to the in-network service URLs.
+
+**Notes:**
+- **Standalone targets are now deprecated for full-stack work but still useful for partial debugging.** `just db-run` / `just obs-up` / `just docker-run` use the same container names (`rental-postgres`, `rental-jaeger`, `rental-api`) as compose, so you can't run them at the same time. Compose is now the authoritative dev workflow; the standalone targets remain handy for "I just want a Postgres" or "I want to run the app from `cargo run` against a compose stack" (in which case stop only the `app` service: `docker compose stop app`).
+- **The first `compose up` fail-and-retry on Loki** taught me that the Loki 3.x config layout differs from older docs floating around the web: `chunks_directory` / `rules_directory` belong under `common.storage.filesystem`, **not** under `storage_config.filesystem`. The latter only takes the TSDB shipper paths now. Wired correctly in the committed config; the historical `docker logs rental-loki` output still shows the failed first start, which is normal — they're past events on a now-running container.
+- **Jaeger image tag drift.** `jaegertracing/all-in-one:1.62` (short version) was retracted from Docker Hub between Step 16-extension and Step 19; the patch tag `1.62.0` is still available. Pinning to the patch version (or moving to `1.65.0` / `latest`) avoids future surprises. The standalone `obs-up` Justfile target still uses `1.62` and would now fail — left as-is since compose has superseded it; rewrite if anyone tries `just obs-up` again.
+- **Per-request log lines.** Loki receives the app's startup logs but **no** per-request log lines, because handlers don't call `tracing::info!` — only span open/close events from `tracing-actix-web`. That's intentional: span data flows to Jaeger via OTLP, not to stdout. If per-request access logs in Grafana matter, either (a) add `tracing::info!` lines in handlers (or a custom `RootSpanBuilder` that emits one log per request) or (b) install a Tempo/Loki tracing-to-logs link instead. Documented as a known property, not a bug.
+- **Docker socket bind-mount on macOS** (`/var/run/docker.sock` + `/var/lib/docker/containers`) works on Docker Desktop because both paths are special-cased by the Mac↔Linux-VM bridge. On Linux native this is a regular bind mount. Promtail-via-Docker-SD has been verified working across both.
+- **Grafana anonymous Admin** is a deliberate dev-only choice via `GF_AUTH_ANONYMOUS_ENABLED=true` + `GF_AUTH_DISABLE_LOGIN_FORM=true`. **Do not** copy this compose file to a deployment context — switch to a real auth provider before exposing port 3000 anywhere.
+- **Compose vs prod.** This file is purely for local dev. For Kubernetes the same topology lives in Helm charts / Argo: app → Service-fronted Postgres, plus an external Loki/Tempo/Mimir or a managed Grafana Cloud. The compose file documents the shape of those connections (env vars on the app, scrape config on Prometheus, Promtail's relabel/JSON pipeline) so they translate without surprise.
+
+**Open issues / reminders:**
+- `obs-up` / `obs-down` / `obs-logs` Justfile targets are now redundant. Decide whether to delete them or update them to the patch-pinned `1.62.0` tag the next time someone touches the Justfile.
+- Grafana has no pre-built dashboards yet — only datasources. A small starter dashboard for HTTP request rate / p95 latency / error rate (off Prometheus) and one for "logs by request_id" (off Loki) would round things out. Provisioning would go under `observability/grafana/provisioning/dashboards/`.
+- The Postgres bind mount `./database` is dev-convenience and intentionally not a named volume; in compose-only setups for a teammate's first run, the dir gets created with whatever the postgres container's `postgres` uid maps to on the host. If permissions get weird, `rm -rf database/ && just compose-up` recreates clean.
+- `just compose-nuke` deletes Loki/Prometheus/Grafana data but **not** the Postgres bind mount (since it's not a named volume). To wipe Postgres too: `docker compose down -v && rm -rf database/`.

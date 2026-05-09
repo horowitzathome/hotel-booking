@@ -1,0 +1,118 @@
+# Full local stack: app + Postgres + Jaeger + Loki + Promtail + Prometheus + Grafana.
+# All services share the default compose network and address each other by service name
+# (no host.docker.internal).
+#
+# Container names match the standalone `just db-run` / `just obs-up` / `just docker-run`
+# targets, so you must NOT run those alongside `docker compose up`.
+#
+# UI / endpoints once up:
+#   - App         http://localhost:8080  (/swagger-ui, /metrics, /api/v1/...)
+#   - Grafana     http://localhost:3000  (anonymous Admin, no login)
+#   - Jaeger UI   http://localhost:16686
+#   - Prometheus  http://localhost:9090
+#   - Loki API    http://localhost:3100  (no UI; queried through Grafana)
+
+services:
+  postgres:
+    image: postgres:18.3
+    container_name: rental-postgres
+    environment:
+      POSTGRES_DB: rental
+      POSTGRES_USER: rental
+      POSTGRES_PASSWORD: rental
+    ports:
+      - "5432:5432"
+    # Reuse the existing host bind mount so dev data survives across `just db-run`
+    # (standalone) and `just compose-up` (compose) modes.
+    volumes:
+      - ./database:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rental -d rental"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.62.0
+    container_name: rental-jaeger
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"   # UI
+      - "4317:4317"     # OTLP/gRPC
+      - "4318:4318"     # OTLP/HTTP
+
+  loki:
+    image: grafana/loki:3.2.1
+    container_name: rental-loki
+    command: -config.file=/etc/loki/loki-config.yaml
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./observability/loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
+      - loki-data:/loki
+
+  promtail:
+    image: grafana/promtail:3.2.1
+    container_name: rental-promtail
+    command: -config.file=/etc/promtail/promtail-config.yaml
+    volumes:
+      - ./observability/promtail/promtail-config.yaml:/etc/promtail/promtail-config.yaml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    depends_on:
+      - loki
+
+  prometheus:
+    image: prom/prometheus:v3.0.1
+    container_name: rental-prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=7d'
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+
+  grafana:
+    image: grafana/grafana:11.3.1
+    container_name: rental-grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_FEATURE_TOGGLES_ENABLE: traceqlEditor
+    depends_on:
+      - loki
+      - prometheus
+      - jaeger
+
+  app:
+    image: rental-api:dev
+    container_name: rental-api
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: postgres://rental:rental@postgres:5432/rental
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
+      APP_NAME: rental-api
+      APP_ENV: production
+      RUST_LOG: info,sqlx=warn,actix_web=info,h2=off,hyper=off,tonic=off,tower=off,reqwest=off
+    depends_on:
+      postgres:
+        condition: service_healthy
+      jaeger:
+        condition: service_started
+
+volumes:
+  loki-data:
+  prometheus-data:
+  grafana-data:
