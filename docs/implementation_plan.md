@@ -446,3 +446,40 @@ The new piece is propagation back to the client: a small `wrap_fn` middleware re
 **Open issues / reminders:**
 - No sampling configured — fine for dev, must be added at the OTel Collector (or via `Sampler::TraceIdRatioBased`) before high-traffic production use.
 - Other domains' instrumentation is pending; mechanical work (one attribute per public fn).
+
+---
+
+### Step 18 — Dockerfile: multi-stage cargo-chef + scratch (2026-05-08, refined 2026-05-09)
+
+**Implemented:** A four-stage Dockerfile that produces a **~18 MB scratch image** containing nothing but a statically-linked musl binary and a CA bundle. Multi-arch ready (linux/amd64 + linux/arm64) via Docker buildx's `TARGETARCH` arg.
+
+- `Dockerfile` — pinned `RUST_VERSION=1.95` and `APP_NAME=claude-test` build args.
+  1. **chef** (`rust:1.95-slim-bookworm`, pinned to `$BUILDPLATFORM` so the toolchain runs on the build host even when cross-compiling) — installs `curl` + `ca-certificates` (needed by `utoipa-swagger-ui`'s build script, which fetches the Swagger UI bundle with `curl`), `musl-tools` + `clang` (needed to link statically against musl), and `cargo install cargo-chef --locked`.
+  2. **planner** — `cargo chef prepare --recipe-path recipe.json` → produces a deterministic dependency manifest.
+  3. **builder** — reads the buildx-supplied `TARGETARCH` (`amd64` / `arm64`) and maps it to the matching Rust musl target (`x86_64-unknown-linux-musl` / `aarch64-unknown-linux-musl`); `rustup target add` adds it. Then `cargo chef cook --release --target $RUST_TARGET` builds dependencies into a cached layer, `COPY . .`, and `cargo build --release --target $RUST_TARGET --bin claude-test` with `SQLX_OFFLINE=true`. The resulting statically-linked binary is copied to `/app/server`.
+  4. **runtime** (`FROM scratch`) — empty base. Copies just two artefacts: the musl-static binary and `/etc/ssl/certs/ca-certificates.crt` (needed by `rustls` for outbound TLS, e.g. the OTLP/gRPC exporter to a remote Tempo/Jaeger collector). Sets `APP_ENV=production`, `SERVER_HOST=0.0.0.0`, `SERVER_PORT=8080`. `EXPOSE 8080`. No shell, no package manager, no libc, no users.
+- `.dockerignore` — excludes `target/`, the `database/` Postgres data dir from `just db-run`, `.env`, `.git/`, `docs/`, IDE / OS noise. Keeps the build context tiny so cargo-chef's caching is effective.
+- `Justfile` — new targets: `sqlx-prepare`, `docker-build`, `docker-run`, `docker-size`, plus the existing `build` / new `build-release` for host-side cargo builds. `docker-run` wires the container to host Postgres + host Jaeger via `host.docker.internal:5432` and `host.docker.internal:4317` — the macOS / Docker Desktop convention.
+- `.sqlx/` — generated via `cargo sqlx prepare -- --all-targets` (40 query metadata files committed). Required because `sqlx::query!`/`query_as!` validate SQL against a live database at compile time, and the Docker builder stage has no DB available; `SQLX_OFFLINE=true` makes the macros consult `.sqlx/` instead.
+
+**Verified live:**
+- Initial distroless variant (2026-05-08) yielded a 58 MB image; switching to musl-static + scratch (2026-05-09) drops it to **~18 MB** — roughly the size of the stripped binary itself, since scratch contributes nothing beyond the layer overhead and the CA bundle (~200 KB).
+- `just docker-build` → cold cache builds dependencies once per target arch (cached by cargo-chef across source-only edits).
+- `just docker-run` → starts cleanly. Logs confirm `env=production` (JSON output), `otlp=true`, migrations applied, 8 actix workers, listening on `0.0.0.0:8080`.
+- `curl /health` → `{"status":"ok"}` + `x-request-id` header.
+- `curl /api/v1/countries` → returns the seeded country list.
+- Container talks to host Postgres + host Jaeger correctly (verified by tail of structured JSON logs).
+
+**Notes:**
+- **Why musl + scratch over distroless?** distroless `cc-debian12` (~22 MB on its own) gives you glibc + libstdc++ for free but ties the binary to that base image's library versions. A musl-static binary has no runtime ABI, so it runs on *anything* that can exec a Linux ELF — scratch, distroless, alpine, an OS upgrade — without a rebuild. Trade-off: the build is a touch slower (musl-libc is recompiled per arch) and certain crates (OpenSSL via `openssl-sys`, glibc-only NSS lookups) need extra care; this project uses `rustls` everywhere so neither bites us.
+- **Cross-arch via `TARGETARCH`.** `docker buildx build --platform linux/amd64,linux/arm64 -t IMAGE:TAG --push .` produces a multi-arch manifest. The `--platform=$BUILDPLATFORM` pin on the chef stage forces the toolchain itself to run on the build host (so a Mac on arm64 doesn't try to *emulate* x86_64 just to run rustc); the cross-compile happens by passing `--target` to cargo. This was an explicit design goal for Step 19 (GitHub Actions multi-arch publish) and is already wired here.
+- **Why `RUST_VERSION=1.95`?** Edition 2024 needs ≥ 1.85, but cargo-chef 0.1.77's transitive deps (`target-spec`, `cargo-platform`, `cargo_metadata`) require ≥ 1.88. 1.95 is just the current pinned stable for reproducibility — anything ≥ 1.88 works.
+- `utoipa-swagger-ui` 9's build.rs panics with `"\`curl\` command not found"` on the bare slim-bookworm image. Installing curl in the chef stage (cost: ~3 MB, builder-only) is the simplest fix; the alternative is vendoring the Swagger UI bundle. The runtime image is unaffected either way.
+- Migrations are *not* `COPY`ed into the runtime image — `sqlx::migrate!("./migrations")` embeds them in the binary at compile time, so they ride along automatically. This is what makes a single-binary scratch image work for a DB-backed app.
+- `SQLX_OFFLINE=true` is set in the builder stage but the host repo can still build against a live DB normally; sqlx prefers the live DB when `DATABASE_URL` is set unless `SQLX_OFFLINE=true` is exported. The `.sqlx/` files just need to be regenerated whenever a `query!` macro changes — `just sqlx-prepare` does this.
+- For comparison, a typical Spring Boot fat-jar on JRE distroless lands at 200–300 MB. **18 MB is roughly an order of magnitude smaller**, which is the headline number when comparing this stack to Java/Spring.
+
+**Open issues / reminders:**
+- `.sqlx/` must be regenerated and committed whenever a `query!` / `query_as!` macro is added or changed; otherwise the Docker build fails. Add to PR review checklist.
+- The runtime image runs as `root` (uid 0) since scratch has no `/etc/passwd` and no `nonroot` user to switch to. For Kubernetes deployment, set `securityContext.runAsUser: 65532` and `runAsNonRoot: true` at the Pod level — that's the cleanest way to get a non-root identity without baking one into the image. Alternative: switch back to `gcr.io/distroless/static-debian12:nonroot` (the static variant — still works with musl binaries, ~6 MB overhead, brings a `nonroot` user with it).
+- Step 19 (GitHub Actions CI) and the planned Grafana / Loki / Promtail step build on this. With the binary now containerised, a unifying `docker-compose.yml` becomes natural — it can wire app + Postgres + Jaeger + (later) Loki + Grafana on a shared docker network without `host.docker.internal` workarounds.

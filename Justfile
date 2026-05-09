@@ -76,9 +76,13 @@ test-one name:
 test-mod mod:
     cargo test {{ mod }}
 
-# Run clippy then all tests
+# Build dev
 build: 
     cargo build
+
+# Build release
+build-release: 
+    cargo build --release
 
 # Run clippy then all tests
 check: lint test
@@ -111,6 +115,36 @@ obs-down:
 obs-logs:
     docker logs -f rental-jaeger
 
+# --- SQLx offline mode (required for Docker builds) ---
+
+# Regenerate .sqlx/ query metadata from the live DB.
+# Commit the resulting .sqlx/ directory so `cargo build` can run with SQLX_OFFLINE=true
+# (i.e. inside the Docker builder stage, where no DB is reachable).
+sqlx-prepare:
+    cargo sqlx prepare -- --all-targets
+
+# --- Docker image (multi-stage cargo-chef + distroless) ---
+
+image_name := env_var_or_default("IMAGE_NAME", "rental-api")
+image_tag  := env_var_or_default("IMAGE_TAG",  "dev")
+
+# Build the production image
+docker-build:
+    docker build -t {{ image_name }}:{{ image_tag }} .
+
+# Run the image, talking to host Postgres + host Jaeger (macOS / Docker Desktop)
+docker-run:
+    docker run --rm --name rental-api \
+        -p 8080:8080 \
+        -e DATABASE_URL=postgres://rental:rental@host.docker.internal:5432/rental \
+        -e OTEL_EXPORTER_OTLP_ENDPOINT=http://host.docker.internal:4317 \
+        -e APP_NAME=rental-api \
+        {{ image_name }}:{{ image_tag }}
+
+# Show final image size
+docker-size:
+    docker images {{ image_name }}:{{ image_tag }}
+
 # CURL Test Commands
 
 # API Health
@@ -118,6 +152,6 @@ api-health:
     curl -v -i localhost:8080/health
 
 # Generate some traffic
-api-traffic:    
+api-traffic:
     curl -v -i http://localhost:8080/api/v1/bookings
     curl -v -i http://localhost:8080/api/v1/countries

@@ -1,0 +1,32 @@
+# Build artefacts
+target/
+**/target/
+
+# Local Postgres data dir from `just db-run`
+database/
+
+# Editor / OS
+.idea/
+.vscode/
+.DS_Store
+
+# Git
+.git/
+.gitignore
+
+# Env / secrets — runtime-injected, not baked into image
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+
+# Docker artefacts
+Dockerfile
+.dockerignore
+
+# Docs / non-build files
+docs/
+README.md
+

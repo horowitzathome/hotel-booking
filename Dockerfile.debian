@@ -1,0 +1,44 @@
+# syntax=docker/dockerfile:1.7
+
+ARG RUST_VERSION=1.95
+ARG APP_NAME=claude-test
+
+# ---- chef base: cargo-chef for cached dependency builds ----
+FROM rust:${RUST_VERSION}-slim-bookworm AS chef
+# curl: utoipa-swagger-ui's build.rs shells out to it to fetch the Swagger UI bundle
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && cargo install cargo-chef --locked
+WORKDIR /app
+
+# ---- planner: produces recipe.json describing the dep graph ----
+FROM chef AS planner
+COPY . .
+RUN cargo chef prepare --recipe-path recipe.json
+
+# ---- builder: cooks deps, then builds the binary ----
+FROM chef AS builder
+ARG APP_NAME
+COPY --from=planner /app/recipe.json recipe.json
+RUN cargo chef cook --release --recipe-path recipe.json
+
+COPY . .
+ENV SQLX_OFFLINE=true
+RUN cargo build --release --bin ${APP_NAME} \
+    && cp target/release/${APP_NAME} /app/server \
+    && strip /app/server
+
+# ---- runtime: distroless cc (glibc + ca-certificates, ~20MB) ----
+FROM gcr.io/distroless/cc-debian12:nonroot AS runtime
+WORKDIR /app
+COPY --from=builder /app/server /app/server
+
+ENV APP_ENV=production \
+    SERVER_HOST=0.0.0.0 \
+    SERVER_PORT=8080 \
+    RUST_LOG=info,sqlx=warn,actix_web=info,h2=off,hyper=off,tonic=off,tower=off,reqwest=off
+
+EXPOSE 8080
+USER nonroot
+ENTRYPOINT ["/app/server"]
