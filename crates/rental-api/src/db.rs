@@ -14,7 +14,7 @@ pub async fn create_pool(config: &AppConfig) -> Result<sqlx::PgPool> {
 
     tracing::info!(max_connections = config.database_max_connections, "database pool created");
 
-    sqlx::migrate!("./migrations").run(&pool).await.context("failed to run database migrations")?;
+    sqlx::migrate!("../../migrations").run(&pool).await.context("failed to run database migrations")?;
 
     tracing::info!("database migrations applied");
 

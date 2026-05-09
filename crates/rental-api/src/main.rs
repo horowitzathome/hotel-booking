@@ -1,4 +1,4 @@
-use claude_test::{AppState, config, db, handlers, openapi::ApiDoc, routes};
+use rental_api::{AppState, config, db, handlers, openapi::ApiDoc, routes};
 
 use actix_web::dev::Service;
 use actix_web::http::header::{HeaderName, HeaderValue};

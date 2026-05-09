@@ -1,10 +1,10 @@
 mod common;
 
 use chrono::NaiveDate;
-use claude_test::errors::AppError;
-use claude_test::models::booking::{BookingStatus, CreateBookingRequest, RecordPaymentRequest};
-use claude_test::models::calendar::{CalendarStatus, CreateCalendarRequest};
-use claude_test::services::{booking as booking_svc, calendar as cal_svc};
+use rental_api::errors::AppError;
+use rental_api::models::booking::{BookingStatus, CreateBookingRequest, RecordPaymentRequest};
+use rental_api::models::calendar::{CalendarStatus, CreateCalendarRequest};
+use rental_api::services::{booking as booking_svc, calendar as cal_svc};
 use rust_decimal::Decimal;
 use sqlx::PgPool;
 
@@ -20,7 +20,7 @@ fn price(cents: i64) -> Decimal {
 // create: flips all calendar entries to Rented on success
 // ---------------------------------------------------------------------------
 
-#[sqlx::test(migrations = "./migrations")]
+#[sqlx::test(migrations = "../../migrations")]
 async fn booking_create_flips_days_to_rented(pool: PgPool) {
     let house_id = common::create_test_house(&pool).await;
     let person_id = common::create_test_person(&pool).await;
@@ -58,7 +58,7 @@ async fn booking_create_flips_days_to_rented(pool: PgPool) {
 // create: returns expected_total_price computed from daily prices
 // ---------------------------------------------------------------------------
 
-#[sqlx::test(migrations = "./migrations")]
+#[sqlx::test(migrations = "../../migrations")]
 async fn booking_create_returns_expected_total_price(pool: PgPool) {
     let house_id = common::create_test_house(&pool).await;
     let person_id = common::create_test_person(&pool).await;
@@ -96,7 +96,7 @@ async fn booking_create_returns_expected_total_price(pool: PgPool) {
 // create: fails when at least one day is NotRentable
 // ---------------------------------------------------------------------------
 
-#[sqlx::test(migrations = "./migrations")]
+#[sqlx::test(migrations = "../../migrations")]
 async fn booking_create_fails_when_day_not_rentable(pool: PgPool) {
     let house_id = common::create_test_house(&pool).await;
     let person_id = common::create_test_person(&pool).await;
@@ -157,7 +157,7 @@ async fn booking_create_fails_when_day_not_rentable(pool: PgPool) {
 // create: fails when calendar entries are missing for some days in the range
 // ---------------------------------------------------------------------------
 
-#[sqlx::test(migrations = "./migrations")]
+#[sqlx::test(migrations = "../../migrations")]
 async fn booking_create_fails_when_entries_missing(pool: PgPool) {
     let house_id = common::create_test_house(&pool).await;
     let person_id = common::create_test_person(&pool).await;
@@ -194,7 +194,7 @@ async fn booking_create_fails_when_entries_missing(pool: PgPool) {
 // cancel: flips calendar entries back to Rentable
 // ---------------------------------------------------------------------------
 
-#[sqlx::test(migrations = "./migrations")]
+#[sqlx::test(migrations = "../../migrations")]
 async fn booking_cancel_flips_days_back_to_rentable(pool: PgPool) {
     let house_id = common::create_test_house(&pool).await;
     let person_id = common::create_test_person(&pool).await;
@@ -234,7 +234,7 @@ async fn booking_cancel_flips_days_back_to_rentable(pool: PgPool) {
 // cancel: fails when booking is already cancelled
 // ---------------------------------------------------------------------------
 
-#[sqlx::test(migrations = "./migrations")]
+#[sqlx::test(migrations = "../../migrations")]
 async fn booking_cancel_fails_when_already_cancelled(pool: PgPool) {
     let house_id = common::create_test_house(&pool).await;
     let person_id = common::create_test_person(&pool).await;
@@ -274,7 +274,7 @@ async fn booking_cancel_fails_when_already_cancelled(pool: PgPool) {
 // record_payment: fails when booking is cancelled
 // ---------------------------------------------------------------------------
 
-#[sqlx::test(migrations = "./migrations")]
+#[sqlx::test(migrations = "../../migrations")]
 async fn payment_fails_on_cancelled_booking(pool: PgPool) {
     let house_id = common::create_test_house(&pool).await;
     let person_id = common::create_test_person(&pool).await;
@@ -323,7 +323,7 @@ async fn payment_fails_on_cancelled_booking(pool: PgPool) {
 // record_payment: do a successful payment
 // ---------------------------------------------------------------------------
 
-#[sqlx::test(migrations = "./migrations")]
+#[sqlx::test(migrations = "../../migrations")]
 async fn payment_successful(pool: PgPool) {
     let house_id = common::create_test_house(&pool).await;
     let person_id = common::create_test_person(&pool).await;

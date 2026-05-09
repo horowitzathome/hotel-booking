@@ -1,10 +1,10 @@
 mod common;
 
 use chrono::NaiveDate;
-use claude_test::errors::AppError;
-use claude_test::models::booking::CreateBookingRequest;
-use claude_test::models::calendar::{CalendarStatus, CreateCalendarRequest};
-use claude_test::services::{booking as booking_svc, calendar as cal_svc};
+use rental_api::errors::AppError;
+use rental_api::models::booking::CreateBookingRequest;
+use rental_api::models::calendar::{CalendarStatus, CreateCalendarRequest};
+use rental_api::services::{booking as booking_svc, calendar as cal_svc};
 use rust_decimal::Decimal;
 use sqlx::PgPool;
 
@@ -20,7 +20,7 @@ fn price(cents: i64) -> Decimal {
 // create: idempotent — skips days that already have an entry
 // ---------------------------------------------------------------------------
 
-#[sqlx::test(migrations = "./migrations")]
+#[sqlx::test(migrations = "../../migrations")]
 async fn create_skips_existing_entries(pool: PgPool) {
     let house_id = common::create_test_house(&pool).await;
 
@@ -50,7 +50,7 @@ async fn create_skips_existing_entries(pool: PgPool) {
 // create: same range twice returns empty on second call
 // ---------------------------------------------------------------------------
 
-#[sqlx::test(migrations = "./migrations")]
+#[sqlx::test(migrations = "../../migrations")]
 async fn create_fully_overlapping_range_returns_empty(pool: PgPool) {
     let house_id = common::create_test_house(&pool).await;
 
@@ -70,7 +70,7 @@ async fn create_fully_overlapping_range_returns_empty(pool: PgPool) {
 // delete: blocked when an active booking covers any entry in the range
 // ---------------------------------------------------------------------------
 
-#[sqlx::test(migrations = "./migrations")]
+#[sqlx::test(migrations = "../../migrations")]
 async fn delete_blocked_by_active_booking(pool: PgPool) {
     let house_id = common::create_test_house(&pool).await;
     let person_id = common::create_test_person(&pool).await;
@@ -109,7 +109,7 @@ async fn delete_blocked_by_active_booking(pool: PgPool) {
 // delete: succeeds once the booking over those entries is cancelled
 // ---------------------------------------------------------------------------
 
-#[sqlx::test(migrations = "./migrations")]
+#[sqlx::test(migrations = "../../migrations")]
 async fn delete_succeeds_after_booking_cancelled(pool: PgPool) {
     let house_id = common::create_test_house(&pool).await;
     let person_id = common::create_test_person(&pool).await;
@@ -149,7 +149,7 @@ async fn delete_succeeds_after_booking_cancelled(pool: PgPool) {
 // delete: non-booked entries outside any booking range can always be removed
 // ---------------------------------------------------------------------------
 
-#[sqlx::test(migrations = "./migrations")]
+#[sqlx::test(migrations = "../../migrations")]
 async fn delete_unboooked_entries_succeeds(pool: PgPool) {
     let house_id = common::create_test_house(&pool).await;
 

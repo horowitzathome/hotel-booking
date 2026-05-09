@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
 ARG RUST_VERSION=1.95
-ARG APP_NAME=claude-test
+ARG APP_NAME=rental-api
 
 # ---- chef base ----
 FROM --platform=$BUILDPLATFORM rust:${RUST_VERSION}-slim-bookworm AS chef

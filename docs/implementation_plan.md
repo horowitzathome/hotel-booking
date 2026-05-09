@@ -78,6 +78,16 @@ Step 19: Setup a docker compose yaml file to spin up the database, the loki, pro
 
 Step 20: GitHub Actions CI pipeline
 
+Step 21: Prepare and then test for workload
+
+- Convert the repo to a workspace (mechanical, ~30 min).
+- Build seeder minimally (countries, managers, persons, houses) using multi-row INSERT. Verify with psql.
+- Add calendar_entries via COPY BINARY — this is where the demo lives. Measure.
+- Add bookings (which means flipping calendar entries — wrap in a transaction).
+- Build loadtest skeleton with one read scenario; confirm goose talks to your API.
+- Add the remaining scenarios + the ID pre-fetch hook.
+- Run the three measurement scenarios above; capture goose HTML reports + a Grafana screenshot for docs/.
+
 ## Suggested starting point
 
 Steps 1–7 give you a compiling, running actix server with health, metrics, structured JSON logs, and a working DB connection — a solid foundation before any domain code. 
