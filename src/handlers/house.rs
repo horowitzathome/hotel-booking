@@ -1,4 +1,5 @@
 use actix_web::{web, HttpResponse};
+use validator::Validate;
 
 use crate::errors::AppError;
 use crate::models::house::{CreateHouseRequest, UpdateHouseRequest};
@@ -51,6 +52,7 @@ pub async fn create(
     state: web::Data<AppState>,
     body: web::Json<CreateHouseRequest>,
 ) -> Result<HttpResponse, AppError> {
+    body.validate()?;
     let house = svc::create(&state.pool, &body).await?;
     let location = format!("/api/v1/houses/{}", house.id);
     Ok(HttpResponse::Created()
@@ -76,6 +78,7 @@ pub async fn update(
     path: web::Path<i64>,
     body: web::Json<UpdateHouseRequest>,
 ) -> Result<HttpResponse, AppError> {
+    body.validate()?;
     let house = svc::update(&state.pool, path.into_inner(), &body).await?;
     Ok(HttpResponse::Ok().json(house))
 }

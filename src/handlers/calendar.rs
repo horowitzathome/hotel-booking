@@ -1,6 +1,7 @@
 use actix_web::{web, HttpResponse};
 use chrono::NaiveDate;
 use serde::Deserialize;
+use validator::Validate;
 
 use crate::errors::AppError;
 use crate::models::calendar::{CreateCalendarRequest, UpdateCalendarPriceRequest};
@@ -80,6 +81,7 @@ pub async fn create(
     path: web::Path<i64>,
     body: web::Json<CreateCalendarRequest>,
 ) -> Result<HttpResponse, AppError> {
+    body.validate()?;
     let house_id = path.into_inner();
     let entries = svc::create(&state.pool, house_id, &body).await?;
     let location = format!("/api/v1/houses/{}/calendar", house_id);
@@ -105,6 +107,7 @@ pub async fn update_price(
     path: web::Path<i64>,
     body: web::Json<UpdateCalendarPriceRequest>,
 ) -> Result<HttpResponse, AppError> {
+    body.validate()?;
     let house_id = path.into_inner();
     let entries = svc::update_price(&state.pool, house_id, &body).await?;
     Ok(HttpResponse::Ok().json(entries))

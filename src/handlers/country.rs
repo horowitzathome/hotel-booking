@@ -1,4 +1,5 @@
 use actix_web::{web, HttpResponse};
+use validator::Validate;
 
 use crate::errors::AppError;
 use crate::models::country::{CreateCountryRequest, UpdateCountryRequest};
@@ -53,6 +54,7 @@ pub async fn create(
     state: web::Data<AppState>,
     body: web::Json<CreateCountryRequest>,
 ) -> Result<HttpResponse, AppError> {
+    body.validate()?;
     let country = svc::create(&state.pool, &body).await?;
     let location = format!("/api/v1/countries/{}", country.id);
     Ok(HttpResponse::Created()
@@ -78,6 +80,7 @@ pub async fn update(
     path: web::Path<i64>,
     body: web::Json<UpdateCountryRequest>,
 ) -> Result<HttpResponse, AppError> {
+    body.validate()?;
     let country = svc::update(&state.pool, path.into_inner(), &body).await?;
     Ok(HttpResponse::Ok().json(country))
 }

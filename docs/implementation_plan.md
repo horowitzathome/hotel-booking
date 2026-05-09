@@ -449,6 +449,41 @@ The new piece is propagation back to the client: a small `wrap_fn` middleware re
 
 ---
 
+### Step 17 — Input validation (`validator` crate) (2026-05-09)
+
+**Implemented:** Declarative request-body validation on every domain `Create*Request` / `Update*Request` / `RecordPaymentRequest` struct via `#[derive(Validate)]` + `#[validate(...)]` field attributes, mapped to a 400 response with the existing `{"error":"validation failed","details":[...]}` JSON shape.
+
+- `src/errors.rs` — added `From<validator::ValidationErrors> for AppError`. The conversion walks `ValidationErrorsKind::{Field, Struct, List}` recursively (the `Struct` / `List` arms are future-proofing for nested validation; we don't use it yet but it's a one-line cost) and emits `"<field>: <code>"` strings into `AppError::ValidationError(Vec<String>)`. Existing `ResponseError` impl already maps that variant to `400 Bad Request` with `details` in the body, so no further wiring was needed. The `details` strings use the validator-crate *codes* (`length`, `email`, `range`, custom name) rather than human-readable messages — sufficient for an API consumer, and avoids per-rule message boilerplate. A small private helper `AppError::validation_details()` is used by the recursive walk to flatten nested struct errors.
+- All eight model request structs got `#[derive(Validate)]` and per-field `#[validate(...)]` attributes:
+  - `CreateCountryRequest` / `UpdateCountryRequest` — `name: length(min=1,max=100)`, `iso_code: length(equal=2)` (matches the `CHAR(2)` Postgres column).
+  - `CreateManagerRequest` / `UpdateManagerRequest` and `CreatePersonRequest` / `UpdatePersonRequest` — `first_name`/`last_name: length(min=1,max=100)`, `email: email + length(max=255)`, `phone: length(min=1,max=50)`.
+  - `CreateAddressRequest` / `UpdateAddressRequest` — `street: length(min=1,max=255)`, `number: length(min=1,max=20)`, `postcode: length(min=1,max=20)`, `city: length(min=1,max=100)`, `province: Option<length(min=1,max=100)>` (validator skips `None` automatically), `country_id: range(min=1)`.
+  - `CreateHouseRequest` / `UpdateHouseRequest` — `name: length(min=1,max=255)`, `description: length(max=2000)` (allows empty), `address_id` / `manager_id: range(min=1)`.
+  - `CreateCalendarRequest` / `UpdateCalendarPriceRequest` — `price: custom(function = validate_non_negative_decimal)` (validator 0.19 doesn't ship a `range` impl for `Decimal`, so a tiny standalone fn in `models/calendar.rs` does it).
+  - `CreateBookingRequest` — `house_id` / `person_id: range(min=1)`.
+  - `RecordPaymentRequest` — `total_paid: custom(function = validate_non_negative_decimal)`, reusing the calendar fn.
+- All seven handler modules (`country`, `manager`, `person`, `address`, `house`, `calendar`, `booking`) got `use validator::Validate;` and a single `body.validate()?;` line at the top of every `create` / `update` / `update_price` / `record_payment` handler. The `?` lifts `ValidationErrors` into `AppError` via the new `From` impl. Date-range and status-value rules (e.g. `from <= to`, `status != Rented`) stay in the service layer where they were before — they are *business* rules (422 Unprocessable Entity), not field-level shape validation (400 Bad Request).
+
+**Verified live:**
+- `POST /api/v1/countries` with `{"name":"","iso_code":"GERMANY"}` → `400 {"error":"validation failed","details":["name: length","iso_code: length"]}` (note: both errors in one response — `validate()` collects all violations).
+- `POST /api/v1/managers` with `{"email":"not-an-email", ...}` → `400 {"error":"validation failed","details":["email: email"]}`.
+- `POST /api/v1/houses/1/calendar` with `"price": -5.0` → `400 {"error":"validation failed","details":["price: must_be_non_negative"]}` (the custom validator's code is the string passed to `ValidationError::new`).
+- `POST /api/v1/countries` with a valid body → `201 Created` + `Location` header + body, unchanged.
+- `cargo build`, `cargo clippy --all-targets`, and `cargo test --lib --bins` all pass without warnings.
+
+**Notes:**
+- **Why manual `body.validate()?;` instead of `actix-web-validator`?** The third-party `actix-web-validator` crate provides a `Json<T: Validate>` extractor that runs validation automatically, removing one line per handler. The trade-off is an extra dependency and a less obvious extraction error path. Six call sites of `body.validate()?;` are cheap; not worth a dependency.
+- **Status code: 400 vs 422.** Per the existing API spec (`docs/api.md`), validation failure (missing/invalid fields) → `400 Bad Request`, business rule violation → `422 Unprocessable Entity`. The split is intentional: validation is shape (could a sane client construct this body?), 422 is policy (the body is well-formed but the operation is forbidden). Keeping `validator` confined to field shape and leaving `from <= to`, `status != Rented`, `not already cancelled`, etc. in the service layer mirrors that split.
+- **Decimal validation.** validator 0.19 implements `range`/`length` for primitive numeric types only. The `custom(function = ...)` form takes a `fn(&T) -> Result<(), ValidationError>` and is the canonical workaround. The function lives in `models/calendar.rs` and is re-exported (via `pub(crate)` + a normal `use`) into `models/booking.rs` for `RecordPaymentRequest`. Avoids a duplicate fn definition.
+- **`Option<String>` fields.** The `validator` derive walks into `Option<T>` automatically — `province: Option<length(min=1,max=100)>` validates only when `Some`, which matches the API spec (`province` may be `null`).
+- **Error code labels in `details`.** Strings like `"name: length"` are the *validator code names*, not pretty messages. They are stable, machine-friendly identifiers that document which rule fired. If a more human-readable form is wanted later, attach `message = "..."` to each `#[validate(...)]` attribute and switch the `From` impl to prefer `err.message` over `err.code`. Not done now — keeps the field annotations terse.
+
+**Open issues / reminders:**
+- No JSON-deserialisation-failure shaping yet. If the body is malformed JSON or a required field is missing, actix-web returns its own 400 / 415 with a non-standard body. To unify, register a custom `JsonConfig::error_handler` in `main.rs` that produces our `{"error":"...","details":[...]}` shape. Cosmetic — defer until a frontend complains.
+- Phase 3 of the implementation plan (Step 19, GitHub Actions CI) is now the only remaining item.
+
+---
+
 ### Step 18 — Dockerfile: multi-stage cargo-chef + scratch (2026-05-08, refined 2026-05-09)
 
 **Implemented:** A four-stage Dockerfile that produces a **~18 MB scratch image** containing nothing but a statically-linked musl binary and a CA bundle. Multi-arch ready (linux/amd64 + linux/arm64) via Docker buildx's `TARGETARCH` arg.

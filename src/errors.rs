@@ -71,3 +71,40 @@ impl From<anyhow::Error> for AppError {
         AppError::Internal(e)
     }
 }
+
+impl From<validator::ValidationErrors> for AppError {
+    fn from(errors: validator::ValidationErrors) -> Self {
+        let mut details = Vec::new();
+        for (field, kind) in errors.errors() {
+            match kind {
+                validator::ValidationErrorsKind::Field(errs) => {
+                    for err in errs {
+                        details.push(format!("{field}: {}", err.code));
+                    }
+                }
+                validator::ValidationErrorsKind::Struct(inner) => {
+                    for d in AppError::from(*inner.clone()).validation_details() {
+                        details.push(format!("{field}.{d}"));
+                    }
+                }
+                validator::ValidationErrorsKind::List(map) => {
+                    for (idx, inner) in map {
+                        for d in AppError::from(*inner.clone()).validation_details() {
+                            details.push(format!("{field}[{idx}].{d}"));
+                        }
+                    }
+                }
+            }
+        }
+        AppError::ValidationError(details)
+    }
+}
+
+impl AppError {
+    fn validation_details(self) -> Vec<String> {
+        match self {
+            AppError::ValidationError(d) => d,
+            _ => Vec::new(),
+        }
+    }
+}

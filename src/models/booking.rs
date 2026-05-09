@@ -2,6 +2,9 @@ use chrono::NaiveDate;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+use validator::Validate;
+
+use crate::models::calendar::validate_non_negative_decimal;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema, sqlx::Type)]
 #[sqlx(type_name = "booking_status")]
@@ -37,16 +40,19 @@ pub struct Booking {
     pub total_paid: Option<Decimal>,
 }
 
-#[derive(Debug, Deserialize, ToSchema)]
+#[derive(Debug, Deserialize, ToSchema, Validate)]
 pub struct CreateBookingRequest {
+    #[validate(range(min = 1))]
     pub house_id: i64,
+    #[validate(range(min = 1))]
     pub person_id: i64,
     pub from: NaiveDate,
     pub to: NaiveDate,
 }
 
-#[derive(Debug, Deserialize, ToSchema)]
+#[derive(Debug, Deserialize, ToSchema, Validate)]
 pub struct RecordPaymentRequest {
     pub paid_at: NaiveDate,
+    #[validate(custom(function = "validate_non_negative_decimal"))]
     pub total_paid: Decimal,
 }

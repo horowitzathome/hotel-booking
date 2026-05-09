@@ -1,4 +1,5 @@
 use actix_web::{web, HttpResponse};
+use validator::Validate;
 
 use crate::errors::AppError;
 use crate::models::address::{CreateAddressRequest, UpdateAddressRequest};
@@ -39,6 +40,7 @@ pub async fn create(
     state: web::Data<AppState>,
     body: web::Json<CreateAddressRequest>,
 ) -> Result<HttpResponse, AppError> {
+    body.validate()?;
     let address = svc::create(&state.pool, &body).await?;
     let location = format!("/api/v1/addresses/{}", address.id);
     Ok(HttpResponse::Created()
@@ -64,6 +66,7 @@ pub async fn update(
     path: web::Path<i64>,
     body: web::Json<UpdateAddressRequest>,
 ) -> Result<HttpResponse, AppError> {
+    body.validate()?;
     let address = svc::update(&state.pool, path.into_inner(), &body).await?;
     Ok(HttpResponse::Ok().json(address))
 }

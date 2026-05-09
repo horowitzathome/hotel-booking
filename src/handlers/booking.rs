@@ -1,5 +1,6 @@
 use actix_web::{web, HttpResponse};
 use serde::Deserialize;
+use validator::Validate;
 
 use crate::errors::AppError;
 use crate::models::booking::{CreateBookingRequest, RecordPaymentRequest};
@@ -66,6 +67,7 @@ pub async fn create(
     state: web::Data<AppState>,
     body: web::Json<CreateBookingRequest>,
 ) -> Result<HttpResponse, AppError> {
+    body.validate()?;
     let booking = svc::create(&state.pool, &body).await?;
     let location = format!("/api/v1/bookings/{}", booking.id);
     Ok(HttpResponse::Created()
@@ -111,6 +113,7 @@ pub async fn record_payment(
     path: web::Path<i64>,
     body: web::Json<RecordPaymentRequest>,
 ) -> Result<HttpResponse, AppError> {
+    body.validate()?;
     let booking = svc::record_payment(&state.pool, path.into_inner(), &body).await?;
     Ok(HttpResponse::Ok().json(booking))
 }
