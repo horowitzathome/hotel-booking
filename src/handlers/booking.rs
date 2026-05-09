@@ -1,11 +1,11 @@
-use actix_web::{web, HttpResponse};
+use actix_web::{HttpResponse, web};
 use serde::Deserialize;
 use validator::Validate;
 
+use crate::AppState;
 use crate::errors::AppError;
 use crate::models::booking::{CreateBookingRequest, RecordPaymentRequest};
 use crate::services::booking as svc;
-use crate::AppState;
 
 #[derive(Deserialize)]
 pub struct BookingListQuery {
@@ -24,10 +24,7 @@ pub struct BookingListQuery {
     ),
     responses((status = 200, description = "List of bookings", body = [crate::models::booking::Booking]))
 )]
-pub async fn list(
-    state: web::Data<AppState>,
-    query: web::Query<BookingListQuery>,
-) -> Result<HttpResponse, AppError> {
+pub async fn list(state: web::Data<AppState>, query: web::Query<BookingListQuery>) -> Result<HttpResponse, AppError> {
     let bookings = svc::list(&state.pool, query.house_id, query.person_id).await?;
     Ok(HttpResponse::Ok().json(bookings))
 }
@@ -43,10 +40,7 @@ pub async fn list(
         (status = 404, description = "Booking not found")
     )
 )]
-pub async fn get(
-    state: web::Data<AppState>,
-    path: web::Path<i64>,
-) -> Result<HttpResponse, AppError> {
+pub async fn get(state: web::Data<AppState>, path: web::Path<i64>) -> Result<HttpResponse, AppError> {
     let booking = svc::get(&state.pool, path.into_inner()).await?;
     Ok(HttpResponse::Ok().json(booking))
 }
@@ -63,16 +57,11 @@ pub async fn get(
         (status = 422, description = "from > to or any day not Rentable")
     )
 )]
-pub async fn create(
-    state: web::Data<AppState>,
-    body: web::Json<CreateBookingRequest>,
-) -> Result<HttpResponse, AppError> {
+pub async fn create(state: web::Data<AppState>, body: web::Json<CreateBookingRequest>) -> Result<HttpResponse, AppError> {
     body.validate()?;
     let booking = svc::create(&state.pool, &body).await?;
     let location = format!("/api/v1/bookings/{}", booking.id);
-    Ok(HttpResponse::Created()
-        .insert_header(("Location", location))
-        .json(booking))
+    Ok(HttpResponse::Created().insert_header(("Location", location)).json(booking))
 }
 
 #[utoipa::path(
@@ -87,10 +76,7 @@ pub async fn create(
         (status = 422, description = "Booking already cancelled")
     )
 )]
-pub async fn cancel(
-    state: web::Data<AppState>,
-    path: web::Path<i64>,
-) -> Result<HttpResponse, AppError> {
+pub async fn cancel(state: web::Data<AppState>, path: web::Path<i64>) -> Result<HttpResponse, AppError> {
     let booking = svc::cancel(&state.pool, path.into_inner()).await?;
     Ok(HttpResponse::Ok().json(booking))
 }
@@ -108,11 +94,7 @@ pub async fn cancel(
         (status = 422, description = "Booking is cancelled")
     )
 )]
-pub async fn record_payment(
-    state: web::Data<AppState>,
-    path: web::Path<i64>,
-    body: web::Json<RecordPaymentRequest>,
-) -> Result<HttpResponse, AppError> {
+pub async fn record_payment(state: web::Data<AppState>, path: web::Path<i64>, body: web::Json<RecordPaymentRequest>) -> Result<HttpResponse, AppError> {
     body.validate()?;
     let booking = svc::record_payment(&state.pool, path.into_inner(), &body).await?;
     Ok(HttpResponse::Ok().json(booking))

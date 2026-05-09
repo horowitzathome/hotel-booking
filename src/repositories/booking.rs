@@ -2,17 +2,11 @@ use rust_decimal::Decimal;
 use sqlx::PgPool;
 
 use crate::errors::AppError;
-use crate::models::booking::{
-    Booking, BookingHouse, BookingPerson, BookingStatus, CreateBookingRequest, RecordPaymentRequest,
-};
+use crate::models::booking::{Booking, BookingHouse, BookingPerson, BookingStatus, CreateBookingRequest, RecordPaymentRequest};
 use crate::models::calendar::CalendarStatus;
 
 #[tracing::instrument(skip(pool), fields(layer = "repository"))]
-pub async fn find_all(
-    pool: &PgPool,
-    house_id: Option<i64>,
-    person_id: Option<i64>,
-) -> Result<Vec<Booking>, AppError> {
+pub async fn find_all(pool: &PgPool, house_id: Option<i64>, person_id: Option<i64>) -> Result<Vec<Booking>, AppError> {
     let rows = sqlx::query!(
         r#"
         SELECT
@@ -45,10 +39,7 @@ pub async fn find_all(
         .into_iter()
         .map(|r| Booking {
             id: r.id,
-            house: BookingHouse {
-                id: r.house_id,
-                name: r.house_name,
-            },
+            house: BookingHouse { id: r.house_id, name: r.house_name },
             person: BookingPerson {
                 id: r.person_id,
                 first_name: r.person_first_name,
@@ -96,10 +87,7 @@ pub async fn find_by_id(pool: &PgPool, id: i64) -> Result<Booking, AppError> {
 
     Ok(Booking {
         id: r.id,
-        house: BookingHouse {
-            id: r.house_id,
-            name: r.house_name,
-        },
+        house: BookingHouse { id: r.house_id, name: r.house_name },
         person: BookingPerson {
             id: r.person_id,
             first_name: r.person_first_name,
@@ -115,10 +103,7 @@ pub async fn find_by_id(pool: &PgPool, id: i64) -> Result<Booking, AppError> {
 }
 
 #[tracing::instrument(skip(pool, req), fields(layer = "repository", house_id = req.house_id, person_id = req.person_id))]
-pub async fn create(
-    pool: &PgPool,
-    req: &CreateBookingRequest,
-) -> Result<(Booking, Decimal), AppError> {
+pub async fn create(pool: &PgPool, req: &CreateBookingRequest) -> Result<(Booking, Decimal), AppError> {
     let mut tx = pool.begin().await.map_err(AppError::from)?;
 
     let entries = sqlx::query!(
@@ -139,15 +124,11 @@ pub async fn create(
 
     let expected_days = (req.to - req.from).num_days() + 1;
     if entries.len() as i64 != expected_days {
-        return Err(AppError::UnprocessableEntity(
-            "not all days in the requested range have calendar entries".into(),
-        ));
+        return Err(AppError::UnprocessableEntity("not all days in the requested range have calendar entries".into()));
     }
 
     if entries.iter().any(|e| e.status != CalendarStatus::Rentable) {
-        return Err(AppError::UnprocessableEntity(
-            "all days in range must be in status 'Rentable'".into(),
-        ));
+        return Err(AppError::UnprocessableEntity("all days in range must be in status 'Rentable'".into()));
     }
 
     let from_calendar_id = entries.first().unwrap().id;
@@ -171,15 +152,10 @@ pub async fn create(
     .await
     .map_err(AppError::from)?;
 
-    sqlx::query!(
-        "UPDATE calendar SET status = 'Rented' WHERE house_id = $1 AND date BETWEEN $2 AND $3",
-        req.house_id,
-        req.from,
-        req.to,
-    )
-    .execute(&mut *tx)
-    .await
-    .map_err(AppError::from)?;
+    sqlx::query!("UPDATE calendar SET status = 'Rented' WHERE house_id = $1 AND date BETWEEN $2 AND $3", req.house_id, req.from, req.to,)
+        .execute(&mut *tx)
+        .await
+        .map_err(AppError::from)?;
 
     tx.commit().await.map_err(AppError::from)?;
 
@@ -208,18 +184,13 @@ pub async fn cancel(pool: &PgPool, id: i64) -> Result<Booking, AppError> {
     })?;
 
     if row.status == BookingStatus::Cancelled {
-        return Err(AppError::UnprocessableEntity(
-            "booking is already cancelled".into(),
-        ));
+        return Err(AppError::UnprocessableEntity("booking is already cancelled".into()));
     }
 
-    sqlx::query!(
-        "UPDATE bookings SET status = 'Cancelled', paid_at = NULL, total_paid = NULL WHERE id = $1",
-        id,
-    )
-    .execute(&mut *tx)
-    .await
-    .map_err(AppError::from)?;
+    sqlx::query!("UPDATE bookings SET status = 'Cancelled', paid_at = NULL, total_paid = NULL WHERE id = $1", id,)
+        .execute(&mut *tx)
+        .await
+        .map_err(AppError::from)?;
 
     sqlx::query!(
         "UPDATE calendar SET status = 'Rentable' WHERE house_id = $1 AND date BETWEEN $2 AND $3",
@@ -237,37 +208,23 @@ pub async fn cancel(pool: &PgPool, id: i64) -> Result<Booking, AppError> {
 }
 
 #[tracing::instrument(skip(pool, req), fields(layer = "repository"))]
-pub async fn record_payment(
-    pool: &PgPool,
-    id: i64,
-    req: &RecordPaymentRequest,
-) -> Result<Booking, AppError> {
-    let status = sqlx::query_scalar!(
-        r#"SELECT status AS "status: BookingStatus" FROM bookings WHERE id = $1"#,
-        id,
-    )
-    .fetch_one(pool)
-    .await
-    .map_err(|e| match e {
-        sqlx::Error::RowNotFound => AppError::NotFound(format!("booking {id} not found")),
-        other => AppError::from(other),
-    })?;
+pub async fn record_payment(pool: &PgPool, id: i64, req: &RecordPaymentRequest) -> Result<Booking, AppError> {
+    let status = sqlx::query_scalar!(r#"SELECT status AS "status: BookingStatus" FROM bookings WHERE id = $1"#, id,)
+        .fetch_one(pool)
+        .await
+        .map_err(|e| match e {
+            sqlx::Error::RowNotFound => AppError::NotFound(format!("booking {id} not found")),
+            other => AppError::from(other),
+        })?;
 
     if status == BookingStatus::Cancelled {
-        return Err(AppError::UnprocessableEntity(
-            "cannot record payment for a cancelled booking".into(),
-        ));
+        return Err(AppError::UnprocessableEntity("cannot record payment for a cancelled booking".into()));
     }
 
-    sqlx::query!(
-        "UPDATE bookings SET paid_at = $1, total_paid = $2 WHERE id = $3",
-        req.paid_at,
-        req.total_paid,
-        id,
-    )
-    .execute(pool)
-    .await
-    .map_err(AppError::from)?;
+    sqlx::query!("UPDATE bookings SET paid_at = $1, total_paid = $2 WHERE id = $3", req.paid_at, req.total_paid, id,)
+        .execute(pool)
+        .await
+        .map_err(AppError::from)?;
 
     find_by_id(pool, id).await
 }

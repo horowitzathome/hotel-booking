@@ -1,10 +1,10 @@
-use actix_web::{web, HttpResponse};
+use actix_web::{HttpResponse, web};
 use validator::Validate;
 
+use crate::AppState;
 use crate::errors::AppError;
 use crate::models::country::{CreateCountryRequest, UpdateCountryRequest};
 use crate::services::country as svc;
-use crate::AppState;
 
 #[utoipa::path(
     get,
@@ -31,10 +31,7 @@ pub async fn list(state: web::Data<AppState>) -> Result<HttpResponse, AppError> 
         (status = 404, description = "Country not found")
     )
 )]
-pub async fn get(
-    state: web::Data<AppState>,
-    path: web::Path<i64>,
-) -> Result<HttpResponse, AppError> {
+pub async fn get(state: web::Data<AppState>, path: web::Path<i64>) -> Result<HttpResponse, AppError> {
     let country = svc::get(&state.pool, path.into_inner()).await?;
     Ok(HttpResponse::Ok().json(country))
 }
@@ -50,16 +47,11 @@ pub async fn get(
         (status = 409, description = "Duplicate iso_code")
     )
 )]
-pub async fn create(
-    state: web::Data<AppState>,
-    body: web::Json<CreateCountryRequest>,
-) -> Result<HttpResponse, AppError> {
+pub async fn create(state: web::Data<AppState>, body: web::Json<CreateCountryRequest>) -> Result<HttpResponse, AppError> {
     body.validate()?;
     let country = svc::create(&state.pool, &body).await?;
     let location = format!("/api/v1/countries/{}", country.id);
-    Ok(HttpResponse::Created()
-        .insert_header(("Location", location))
-        .json(country))
+    Ok(HttpResponse::Created().insert_header(("Location", location)).json(country))
 }
 
 #[utoipa::path(
@@ -75,11 +67,7 @@ pub async fn create(
         (status = 409, description = "Unique constraint conflict")
     )
 )]
-pub async fn update(
-    state: web::Data<AppState>,
-    path: web::Path<i64>,
-    body: web::Json<UpdateCountryRequest>,
-) -> Result<HttpResponse, AppError> {
+pub async fn update(state: web::Data<AppState>, path: web::Path<i64>, body: web::Json<UpdateCountryRequest>) -> Result<HttpResponse, AppError> {
     body.validate()?;
     let country = svc::update(&state.pool, path.into_inner(), &body).await?;
     Ok(HttpResponse::Ok().json(country))
@@ -97,10 +85,7 @@ pub async fn update(
         (status = 409, description = "Country is referenced by an address")
     )
 )]
-pub async fn delete(
-    state: web::Data<AppState>,
-    path: web::Path<i64>,
-) -> Result<HttpResponse, AppError> {
+pub async fn delete(state: web::Data<AppState>, path: web::Path<i64>) -> Result<HttpResponse, AppError> {
     svc::delete(&state.pool, path.into_inner()).await?;
     Ok(HttpResponse::NoContent().finish())
 }

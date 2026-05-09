@@ -35,8 +35,7 @@ impl ResponseError for AppError {
     fn error_response(&self) -> HttpResponse {
         if let Self::Internal(e) = self {
             tracing::error!(error = ?e, "internal server error");
-            return HttpResponse::InternalServerError()
-                .json(json!({"error": "internal server error"}));
+            return HttpResponse::InternalServerError().json(json!({"error": "internal server error"}));
         }
 
         let body = match self {

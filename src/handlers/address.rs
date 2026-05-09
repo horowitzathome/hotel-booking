@@ -1,10 +1,10 @@
-use actix_web::{web, HttpResponse};
+use actix_web::{HttpResponse, web};
 use validator::Validate;
 
+use crate::AppState;
 use crate::errors::AppError;
 use crate::models::address::{CreateAddressRequest, UpdateAddressRequest};
 use crate::services::address as svc;
-use crate::AppState;
 
 #[utoipa::path(
     get,
@@ -17,10 +17,7 @@ use crate::AppState;
         (status = 404, description = "Address not found")
     )
 )]
-pub async fn get(
-    state: web::Data<AppState>,
-    path: web::Path<i64>,
-) -> Result<HttpResponse, AppError> {
+pub async fn get(state: web::Data<AppState>, path: web::Path<i64>) -> Result<HttpResponse, AppError> {
     let address = svc::get(&state.pool, path.into_inner()).await?;
     Ok(HttpResponse::Ok().json(address))
 }
@@ -36,16 +33,11 @@ pub async fn get(
         (status = 409, description = "Unknown country_id")
     )
 )]
-pub async fn create(
-    state: web::Data<AppState>,
-    body: web::Json<CreateAddressRequest>,
-) -> Result<HttpResponse, AppError> {
+pub async fn create(state: web::Data<AppState>, body: web::Json<CreateAddressRequest>) -> Result<HttpResponse, AppError> {
     body.validate()?;
     let address = svc::create(&state.pool, &body).await?;
     let location = format!("/api/v1/addresses/{}", address.id);
-    Ok(HttpResponse::Created()
-        .insert_header(("Location", location))
-        .json(address))
+    Ok(HttpResponse::Created().insert_header(("Location", location)).json(address))
 }
 
 #[utoipa::path(
@@ -61,11 +53,7 @@ pub async fn create(
         (status = 409, description = "Unknown country_id")
     )
 )]
-pub async fn update(
-    state: web::Data<AppState>,
-    path: web::Path<i64>,
-    body: web::Json<UpdateAddressRequest>,
-) -> Result<HttpResponse, AppError> {
+pub async fn update(state: web::Data<AppState>, path: web::Path<i64>, body: web::Json<UpdateAddressRequest>) -> Result<HttpResponse, AppError> {
     body.validate()?;
     let address = svc::update(&state.pool, path.into_inner(), &body).await?;
     Ok(HttpResponse::Ok().json(address))
@@ -83,10 +71,7 @@ pub async fn update(
         (status = 409, description = "Address is referenced by a house")
     )
 )]
-pub async fn delete(
-    state: web::Data<AppState>,
-    path: web::Path<i64>,
-) -> Result<HttpResponse, AppError> {
+pub async fn delete(state: web::Data<AppState>, path: web::Path<i64>) -> Result<HttpResponse, AppError> {
     svc::delete(&state.pool, path.into_inner()).await?;
     Ok(HttpResponse::NoContent().finish())
 }

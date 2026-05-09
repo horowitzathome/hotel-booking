@@ -3,12 +3,10 @@ use sqlx::PgPool;
 /// Creates the full hierarchy required by a house: country → address → manager → house.
 /// Returns the house id.
 pub async fn create_test_house(pool: &PgPool) -> i64 {
-    let country_id: i64 = sqlx::query_scalar(
-        "INSERT INTO countries (name, iso_code) VALUES ('Germany', 'DE') RETURNING id",
-    )
-    .fetch_one(pool)
-    .await
-    .unwrap();
+    let country_id: i64 = sqlx::query_scalar("INSERT INTO countries (name, iso_code) VALUES ('Germany', 'DE') RETURNING id")
+        .fetch_one(pool)
+        .await
+        .unwrap();
 
     let address_id: i64 = sqlx::query_scalar(
         "INSERT INTO addresses (street, number, postcode, city, country_id) \

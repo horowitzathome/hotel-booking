@@ -50,9 +50,7 @@ where
     T::Err: std::error::Error + Send + Sync + 'static,
 {
     match env::var(key) {
-        Ok(val) => val
-            .parse()
-            .with_context(|| format!("invalid value for env var: {key}")),
+        Ok(val) => val.parse().with_context(|| format!("invalid value for env var: {key}")),
         Err(_) => Ok(default),
     }
 }

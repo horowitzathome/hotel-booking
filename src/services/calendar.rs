@@ -7,28 +7,19 @@ use crate::repositories::calendar as repo;
 
 fn validate_create_status(status: CalendarStatus) -> Result<(), AppError> {
     if status == CalendarStatus::Rented {
-        return Err(AppError::UnprocessableEntity(
-            "status 'Rented' cannot be set via calendar endpoints".into(),
-        ));
+        return Err(AppError::UnprocessableEntity("status 'Rented' cannot be set via calendar endpoints".into()));
     }
     Ok(())
 }
 
 fn validate_date_range(from: NaiveDate, to: NaiveDate) -> Result<(), AppError> {
     if from > to {
-        return Err(AppError::UnprocessableEntity(
-            "'from' must not be after 'to'".into(),
-        ));
+        return Err(AppError::UnprocessableEntity("'from' must not be after 'to'".into()));
     }
     Ok(())
 }
 
-pub async fn list(
-    pool: &PgPool,
-    house_id: i64,
-    from: Option<NaiveDate>,
-    to: Option<NaiveDate>,
-) -> Result<Vec<CalendarEntry>, AppError> {
+pub async fn list(pool: &PgPool, house_id: i64, from: Option<NaiveDate>, to: Option<NaiveDate>) -> Result<Vec<CalendarEntry>, AppError> {
     repo::find_all(pool, house_id, from, to).await
 }
 
@@ -36,31 +27,18 @@ pub async fn get(pool: &PgPool, house_id: i64, id: i64) -> Result<CalendarEntry,
     repo::find_by_id(pool, house_id, id).await
 }
 
-pub async fn create(
-    pool: &PgPool,
-    house_id: i64,
-    req: &CreateCalendarRequest,
-) -> Result<Vec<CalendarEntry>, AppError> {
+pub async fn create(pool: &PgPool, house_id: i64, req: &CreateCalendarRequest) -> Result<Vec<CalendarEntry>, AppError> {
     validate_create_status(req.status)?;
     validate_date_range(req.from, req.to)?;
     repo::create(pool, house_id, req).await
 }
 
-pub async fn update_price(
-    pool: &PgPool,
-    house_id: i64,
-    req: &UpdateCalendarPriceRequest,
-) -> Result<Vec<CalendarEntry>, AppError> {
+pub async fn update_price(pool: &PgPool, house_id: i64, req: &UpdateCalendarPriceRequest) -> Result<Vec<CalendarEntry>, AppError> {
     validate_date_range(req.from, req.to)?;
     repo::update_price(pool, house_id, req).await
 }
 
-pub async fn delete(
-    pool: &PgPool,
-    house_id: i64,
-    from: NaiveDate,
-    to: NaiveDate,
-) -> Result<(), AppError> {
+pub async fn delete(pool: &PgPool, house_id: i64, from: NaiveDate, to: NaiveDate) -> Result<(), AppError> {
     validate_date_range(from, to)?;
     repo::delete(pool, house_id, from, to).await
 }
@@ -75,10 +53,7 @@ mod tests {
 
     #[test]
     fn create_rejects_rented_status() {
-        assert!(matches!(
-            validate_create_status(CalendarStatus::Rented),
-            Err(AppError::UnprocessableEntity(_))
-        ));
+        assert!(matches!(validate_create_status(CalendarStatus::Rented), Err(AppError::UnprocessableEntity(_))));
     }
 
     #[test]
@@ -89,10 +64,7 @@ mod tests {
 
     #[test]
     fn date_range_rejects_inverted() {
-        assert!(matches!(
-            validate_date_range(d("2024-07-10"), d("2024-07-01")),
-            Err(AppError::UnprocessableEntity(_))
-        ));
+        assert!(matches!(validate_date_range(d("2024-07-10"), d("2024-07-01")), Err(AppError::UnprocessableEntity(_))));
     }
 
     #[test]

@@ -1,10 +1,10 @@
-use actix_web::{web, HttpResponse};
+use actix_web::{HttpResponse, web};
 use validator::Validate;
 
+use crate::AppState;
 use crate::errors::AppError;
 use crate::models::manager::{CreateManagerRequest, UpdateManagerRequest};
 use crate::services::manager as svc;
-use crate::AppState;
 
 #[utoipa::path(
     get,
@@ -29,10 +29,7 @@ pub async fn list(state: web::Data<AppState>) -> Result<HttpResponse, AppError> 
         (status = 404, description = "Manager not found")
     )
 )]
-pub async fn get(
-    state: web::Data<AppState>,
-    path: web::Path<i64>,
-) -> Result<HttpResponse, AppError> {
+pub async fn get(state: web::Data<AppState>, path: web::Path<i64>) -> Result<HttpResponse, AppError> {
     let manager = svc::get(&state.pool, path.into_inner()).await?;
     Ok(HttpResponse::Ok().json(manager))
 }
@@ -48,16 +45,11 @@ pub async fn get(
         (status = 409, description = "Duplicate email")
     )
 )]
-pub async fn create(
-    state: web::Data<AppState>,
-    body: web::Json<CreateManagerRequest>,
-) -> Result<HttpResponse, AppError> {
+pub async fn create(state: web::Data<AppState>, body: web::Json<CreateManagerRequest>) -> Result<HttpResponse, AppError> {
     body.validate()?;
     let manager = svc::create(&state.pool, &body).await?;
     let location = format!("/api/v1/managers/{}", manager.id);
-    Ok(HttpResponse::Created()
-        .insert_header(("Location", location))
-        .json(manager))
+    Ok(HttpResponse::Created().insert_header(("Location", location)).json(manager))
 }
 
 #[utoipa::path(
@@ -73,11 +65,7 @@ pub async fn create(
         (status = 409, description = "Unique constraint conflict")
     )
 )]
-pub async fn update(
-    state: web::Data<AppState>,
-    path: web::Path<i64>,
-    body: web::Json<UpdateManagerRequest>,
-) -> Result<HttpResponse, AppError> {
+pub async fn update(state: web::Data<AppState>, path: web::Path<i64>, body: web::Json<UpdateManagerRequest>) -> Result<HttpResponse, AppError> {
     body.validate()?;
     let manager = svc::update(&state.pool, path.into_inner(), &body).await?;
     Ok(HttpResponse::Ok().json(manager))
@@ -95,10 +83,7 @@ pub async fn update(
         (status = 409, description = "Manager is referenced by a house")
     )
 )]
-pub async fn delete(
-    state: web::Data<AppState>,
-    path: web::Path<i64>,
-) -> Result<HttpResponse, AppError> {
+pub async fn delete(state: web::Data<AppState>, path: web::Path<i64>) -> Result<HttpResponse, AppError> {
     svc::delete(&state.pool, path.into_inner()).await?;
     Ok(HttpResponse::NoContent().finish())
 }

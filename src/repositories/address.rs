@@ -82,9 +82,7 @@ pub async fn update(pool: &PgPool, id: i64, req: &UpdateAddressRequest) -> Resul
 }
 
 pub async fn delete(pool: &PgPool, id: i64) -> Result<(), AppError> {
-    let result = sqlx::query!("DELETE FROM addresses WHERE id = $1", id)
-        .execute(pool)
-        .await?;
+    let result = sqlx::query!("DELETE FROM addresses WHERE id = $1", id).execute(pool).await?;
     if result.rows_affected() == 0 {
         return Err(AppError::NotFound(format!("address {id} not found")));
     }

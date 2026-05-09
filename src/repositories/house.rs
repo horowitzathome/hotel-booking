@@ -38,31 +38,34 @@ pub async fn find_all(pool: &PgPool) -> Result<Vec<House>, AppError> {
     .await
     .map_err(AppError::from)?;
 
-    Ok(rows.into_iter().map(|row| House {
-        id: row.house_id,
-        name: row.house_name,
-        description: row.house_description,
-        address: Address {
-            id: row.addr_id,
-            street: row.addr_street,
-            number: row.addr_number,
-            postcode: row.addr_postcode,
-            city: row.addr_city,
-            province: row.addr_province,
-            country: Country {
-                id: row.country_id,
-                name: row.country_name,
-                iso_code: row.country_iso_code,
+    Ok(rows
+        .into_iter()
+        .map(|row| House {
+            id: row.house_id,
+            name: row.house_name,
+            description: row.house_description,
+            address: Address {
+                id: row.addr_id,
+                street: row.addr_street,
+                number: row.addr_number,
+                postcode: row.addr_postcode,
+                city: row.addr_city,
+                province: row.addr_province,
+                country: Country {
+                    id: row.country_id,
+                    name: row.country_name,
+                    iso_code: row.country_iso_code,
+                },
             },
-        },
-        manager: Manager {
-            id: row.mgr_id,
-            first_name: row.mgr_first_name,
-            last_name: row.mgr_last_name,
-            email: row.mgr_email,
-            phone: row.mgr_phone,
-        },
-    }).collect())
+            manager: Manager {
+                id: row.mgr_id,
+                first_name: row.mgr_first_name,
+                last_name: row.mgr_last_name,
+                email: row.mgr_email,
+                phone: row.mgr_phone,
+            },
+        })
+        .collect())
 }
 
 pub async fn find_by_id(pool: &PgPool, id: i64) -> Result<House, AppError> {
@@ -167,9 +170,7 @@ pub async fn update(pool: &PgPool, id: i64, req: &UpdateHouseRequest) -> Result<
 }
 
 pub async fn delete(pool: &PgPool, id: i64) -> Result<(), AppError> {
-    let result = sqlx::query!("DELETE FROM houses WHERE id = $1", id)
-        .execute(pool)
-        .await?;
+    let result = sqlx::query!("DELETE FROM houses WHERE id = $1", id).execute(pool).await?;
     if result.rows_affected() == 0 {
         return Err(AppError::NotFound(format!("house {id} not found")));
     }

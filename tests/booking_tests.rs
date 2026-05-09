@@ -50,14 +50,7 @@ async fn booking_create_flips_days_to_rented(pool: PgPool) {
     .await
     .unwrap();
 
-    let entries = cal_svc::list(
-        &pool,
-        house_id,
-        Some(d("2024-06-10")),
-        Some(d("2024-06-12")),
-    )
-    .await
-    .unwrap();
+    let entries = cal_svc::list(&pool, house_id, Some(d("2024-06-10")), Some(d("2024-06-12"))).await.unwrap();
     assert!(entries.iter().all(|e| e.status == CalendarStatus::Rented));
 }
 
@@ -157,10 +150,7 @@ async fn booking_create_fails_when_day_not_rentable(pool: PgPool) {
     )
     .await;
 
-    assert!(
-        matches!(result, Err(AppError::UnprocessableEntity(_))),
-        "expected UnprocessableEntity, got {result:?}"
-    );
+    assert!(matches!(result, Err(AppError::UnprocessableEntity(_))), "expected UnprocessableEntity, got {result:?}");
 }
 
 // ---------------------------------------------------------------------------
@@ -197,10 +187,7 @@ async fn booking_create_fails_when_entries_missing(pool: PgPool) {
     )
     .await;
 
-    assert!(
-        matches!(result, Err(AppError::UnprocessableEntity(_))),
-        "expected UnprocessableEntity, got {result:?}"
-    );
+    assert!(matches!(result, Err(AppError::UnprocessableEntity(_))), "expected UnprocessableEntity, got {result:?}");
 }
 
 // ---------------------------------------------------------------------------
@@ -239,14 +226,7 @@ async fn booking_cancel_flips_days_back_to_rentable(pool: PgPool) {
 
     booking_svc::cancel(&pool, booking.id).await.unwrap();
 
-    let entries = cal_svc::list(
-        &pool,
-        house_id,
-        Some(d("2024-09-01")),
-        Some(d("2024-09-03")),
-    )
-    .await
-    .unwrap();
+    let entries = cal_svc::list(&pool, house_id, Some(d("2024-09-01")), Some(d("2024-09-03"))).await.unwrap();
     assert!(entries.iter().all(|e| e.status == CalendarStatus::Rentable));
 }
 
@@ -287,10 +267,7 @@ async fn booking_cancel_fails_when_already_cancelled(pool: PgPool) {
     booking_svc::cancel(&pool, booking.id).await.unwrap();
 
     let result = booking_svc::cancel(&pool, booking.id).await;
-    assert!(
-        matches!(result, Err(AppError::UnprocessableEntity(_))),
-        "expected UnprocessableEntity on double-cancel, got {result:?}"
-    );
+    assert!(matches!(result, Err(AppError::UnprocessableEntity(_))), "expected UnprocessableEntity on double-cancel, got {result:?}");
 }
 
 // ---------------------------------------------------------------------------
@@ -339,10 +316,7 @@ async fn payment_fails_on_cancelled_booking(pool: PgPool) {
     )
     .await;
 
-    assert!(
-        matches!(result, Err(AppError::UnprocessableEntity(_))),
-        "expected UnprocessableEntity, got {result:?}"
-    );
+    assert!(matches!(result, Err(AppError::UnprocessableEntity(_))), "expected UnprocessableEntity, got {result:?}");
 }
 
 // ---------------------------------------------------------------------------
@@ -370,29 +344,11 @@ async fn payment_successful(pool: PgPool) {
     .await
     .unwrap();
 
-    let booking = booking_svc::create(
-        &pool,
-        &CreateBookingRequest {
-            house_id,
-            person_id,
-            from,
-            to,
-        },
-    )
-    .await
-    .unwrap();
+    let booking = booking_svc::create(&pool, &CreateBookingRequest { house_id, person_id, from, to }).await.unwrap();
 
     let price = price(20000);
 
-    let result = booking_svc::record_payment(
-        &pool,
-        booking.id,
-        &RecordPaymentRequest {
-            paid_at: from,
-            total_paid: price,
-        },
-    )
-    .await;
+    let result = booking_svc::record_payment(&pool, booking.id, &RecordPaymentRequest { paid_at: from, total_paid: price }).await;
 
     assert!(result.is_ok());
 

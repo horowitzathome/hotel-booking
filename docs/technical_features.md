@@ -13,7 +13,7 @@ The program must have the following technical features:
 - K8S enabled
 - Interacting with Postgres
 - Hosted later on GitHub 
-- Respective Github Actions to build docker image and to deploy to GitHub and DockerHub
+- Respective Github Actions to build docker image and to deploy to GitHub
 - 
 ### Crates to use
 

@@ -4,27 +4,20 @@ use crate::errors::AppError;
 use crate::models::manager::{CreateManagerRequest, Manager, UpdateManagerRequest};
 
 pub async fn find_all(pool: &PgPool) -> Result<Vec<Manager>, AppError> {
-    let rows = sqlx::query_as!(
-        Manager,
-        "SELECT id, first_name, last_name, email, phone FROM managers ORDER BY last_name, first_name"
-    )
-    .fetch_all(pool)
-    .await?;
+    let rows = sqlx::query_as!(Manager, "SELECT id, first_name, last_name, email, phone FROM managers ORDER BY last_name, first_name")
+        .fetch_all(pool)
+        .await?;
     Ok(rows)
 }
 
 pub async fn find_by_id(pool: &PgPool, id: i64) -> Result<Manager, AppError> {
-    sqlx::query_as!(
-        Manager,
-        "SELECT id, first_name, last_name, email, phone FROM managers WHERE id = $1",
-        id
-    )
-    .fetch_one(pool)
-    .await
-    .map_err(|e| match e {
-        sqlx::Error::RowNotFound => AppError::NotFound(format!("manager {id} not found")),
-        other => AppError::from(other),
-    })
+    sqlx::query_as!(Manager, "SELECT id, first_name, last_name, email, phone FROM managers WHERE id = $1", id)
+        .fetch_one(pool)
+        .await
+        .map_err(|e| match e {
+            sqlx::Error::RowNotFound => AppError::NotFound(format!("manager {id} not found")),
+            other => AppError::from(other),
+        })
 }
 
 pub async fn create(pool: &PgPool, req: &CreateManagerRequest) -> Result<Manager, AppError> {
@@ -43,11 +36,7 @@ pub async fn create(pool: &PgPool, req: &CreateManagerRequest) -> Result<Manager
     .map_err(AppError::from)
 }
 
-pub async fn update(
-    pool: &PgPool,
-    id: i64,
-    req: &UpdateManagerRequest,
-) -> Result<Manager, AppError> {
+pub async fn update(pool: &PgPool, id: i64, req: &UpdateManagerRequest) -> Result<Manager, AppError> {
     sqlx::query_as!(
         Manager,
         "UPDATE managers
@@ -69,9 +58,7 @@ pub async fn update(
 }
 
 pub async fn delete(pool: &PgPool, id: i64) -> Result<(), AppError> {
-    let result = sqlx::query!("DELETE FROM managers WHERE id = $1", id)
-        .execute(pool)
-        .await?;
+    let result = sqlx::query!("DELETE FROM managers WHERE id = $1", id).execute(pool).await?;
     if result.rows_affected() == 0 {
         return Err(AppError::NotFound(format!("manager {id} not found")));
     }

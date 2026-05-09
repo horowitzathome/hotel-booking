@@ -4,12 +4,7 @@ use sqlx::PgPool;
 use crate::errors::AppError;
 use crate::models::calendar::{CalendarEntry, CalendarStatus, CreateCalendarRequest, UpdateCalendarPriceRequest};
 
-pub async fn find_all(
-    pool: &PgPool,
-    house_id: i64,
-    from: Option<NaiveDate>,
-    to: Option<NaiveDate>,
-) -> Result<Vec<CalendarEntry>, AppError> {
+pub async fn find_all(pool: &PgPool, house_id: i64, from: Option<NaiveDate>, to: Option<NaiveDate>) -> Result<Vec<CalendarEntry>, AppError> {
     let rows = sqlx::query!(
         r#"
         SELECT id, date, status AS "status: CalendarStatus", price
@@ -47,9 +42,7 @@ pub async fn find_by_id(pool: &PgPool, house_id: i64, id: i64) -> Result<Calenda
     .fetch_one(pool)
     .await
     .map_err(|e| match e {
-        sqlx::Error::RowNotFound => {
-            AppError::NotFound(format!("calendar entry {id} not found for house {house_id}"))
-        }
+        sqlx::Error::RowNotFound => AppError::NotFound(format!("calendar entry {id} not found for house {house_id}")),
         other => AppError::from(other),
     })?;
 
@@ -61,11 +54,7 @@ pub async fn find_by_id(pool: &PgPool, house_id: i64, id: i64) -> Result<Calenda
     })
 }
 
-pub async fn create(
-    pool: &PgPool,
-    house_id: i64,
-    req: &CreateCalendarRequest,
-) -> Result<Vec<CalendarEntry>, AppError> {
+pub async fn create(pool: &PgPool, house_id: i64, req: &CreateCalendarRequest) -> Result<Vec<CalendarEntry>, AppError> {
     let mut tx = pool.begin().await.map_err(AppError::from)?;
     let mut created = Vec::new();
 
@@ -103,11 +92,7 @@ pub async fn create(
     Ok(created)
 }
 
-pub async fn update_price(
-    pool: &PgPool,
-    house_id: i64,
-    req: &UpdateCalendarPriceRequest,
-) -> Result<Vec<CalendarEntry>, AppError> {
+pub async fn update_price(pool: &PgPool, house_id: i64, req: &UpdateCalendarPriceRequest) -> Result<Vec<CalendarEntry>, AppError> {
     let mut rows = sqlx::query!(
         r#"
         UPDATE calendar
@@ -137,12 +122,7 @@ pub async fn update_price(
         .collect())
 }
 
-pub async fn delete(
-    pool: &PgPool,
-    house_id: i64,
-    from: NaiveDate,
-    to: NaiveDate,
-) -> Result<(), AppError> {
+pub async fn delete(pool: &PgPool, house_id: i64, from: NaiveDate, to: NaiveDate) -> Result<(), AppError> {
     // Check if any entry in the range belongs to a non-cancelled booking
     let count = sqlx::query_scalar!(
         r#"
@@ -165,20 +145,13 @@ pub async fn delete(
     .map_err(AppError::from)?;
 
     if count.unwrap_or(0) > 0 {
-        return Err(AppError::Conflict(
-            "one or more calendar entries are referenced by active bookings".into(),
-        ));
+        return Err(AppError::Conflict("one or more calendar entries are referenced by active bookings".into()));
     }
 
-    sqlx::query!(
-        "DELETE FROM calendar WHERE house_id = $1 AND date BETWEEN $2 AND $3",
-        house_id,
-        from,
-        to,
-    )
-    .execute(pool)
-    .await
-    .map_err(AppError::from)?;
+    sqlx::query!("DELETE FROM calendar WHERE house_id = $1 AND date BETWEEN $2 AND $3", house_id, from, to,)
+        .execute(pool)
+        .await
+        .map_err(AppError::from)?;
 
     Ok(())
 }

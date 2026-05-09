@@ -16,11 +16,7 @@ pub async fn create(pool: &PgPool, req: &CreateCountryRequest) -> Result<Country
     repo::create(pool, req).await
 }
 
-pub async fn update(
-    pool: &PgPool,
-    id: i64,
-    req: &UpdateCountryRequest,
-) -> Result<Country, AppError> {
+pub async fn update(pool: &PgPool, id: i64, req: &UpdateCountryRequest) -> Result<Country, AppError> {
     repo::update(pool, id, req).await
 }
 

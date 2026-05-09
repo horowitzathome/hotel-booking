@@ -1,8 +1,8 @@
-use claude_test::{config, db, handlers, openapi::ApiDoc, routes, AppState};
+use claude_test::{AppState, config, db, handlers, openapi::ApiDoc, routes};
 
 use actix_web::dev::Service;
 use actix_web::http::header::{HeaderName, HeaderValue};
-use actix_web::{web, App, HttpMessage, HttpServer};
+use actix_web::{App, HttpMessage, HttpServer, web};
 use actix_web_prom::PrometheusMetricsBuilder;
 use anyhow::Result;
 use opentelemetry::trace::TracerProvider as _;
@@ -17,10 +17,8 @@ use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
 fn init_tracing(is_development: bool, service_name: &str) -> Option<SdkTracerProvider> {
-    let default_filter =
-        "info,sqlx=warn,actix_web=info,h2=off,hyper=off,tonic=off,tower=off,reqwest=off";
-    let filter =
-        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(default_filter));
+    let default_filter = "info,sqlx=warn,actix_web=info,h2=off,hyper=off,tonic=off,tower=off,reqwest=off";
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(default_filter));
 
     let fmt_layer = if is_development {
         tracing_subscriber::fmt::layer().boxed()
@@ -28,20 +26,14 @@ fn init_tracing(is_development: bool, service_name: &str) -> Option<SdkTracerPro
         tracing_subscriber::fmt::layer().json().boxed()
     };
 
-    let provider = std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT")
-        .ok()
-        .map(|endpoint| build_otel_provider(&endpoint, service_name));
+    let provider = std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT").ok().map(|endpoint| build_otel_provider(&endpoint, service_name));
 
     let otel_layer = provider.as_ref().map(|p| {
         let tracer = p.tracer(service_name.to_string());
         tracing_opentelemetry::layer().with_tracer(tracer)
     });
 
-    tracing_subscriber::registry()
-        .with(filter)
-        .with(fmt_layer)
-        .with(otel_layer)
-        .init();
+    tracing_subscriber::registry().with(filter).with(fmt_layer).with(otel_layer).init();
 
     if let Some(p) = provider.as_ref() {
         opentelemetry::global::set_tracer_provider(p.clone());
@@ -50,20 +42,11 @@ fn init_tracing(is_development: bool, service_name: &str) -> Option<SdkTracerPro
 }
 
 fn build_otel_provider(endpoint: &str, service_name: &str) -> SdkTracerProvider {
-    let exporter = SpanExporter::builder()
-        .with_tonic()
-        .with_endpoint(endpoint)
-        .build()
-        .expect("failed to build OTLP span exporter");
+    let exporter = SpanExporter::builder().with_tonic().with_endpoint(endpoint).build().expect("failed to build OTLP span exporter");
 
-    let resource = Resource::builder()
-        .with_service_name(service_name.to_string())
-        .build();
+    let resource = Resource::builder().with_service_name(service_name.to_string()).build();
 
-    SdkTracerProvider::builder()
-        .with_resource(resource)
-        .with_batch_exporter(exporter)
-        .build()
+    SdkTracerProvider::builder().with_resource(resource).with_batch_exporter(exporter).build()
 }
 
 #[actix_web::main]
@@ -105,8 +88,7 @@ async fn main() -> Result<()> {
                     if let Some(id) = request_id
                         && let Ok(value) = HeaderValue::from_str(&format!("{id}"))
                     {
-                        res.headers_mut()
-                            .insert(HeaderName::from_static("x-request-id"), value);
+                        res.headers_mut().insert(HeaderName::from_static("x-request-id"), value);
                     }
                     Ok(res)
                 }
@@ -114,10 +96,7 @@ async fn main() -> Result<()> {
             .wrap(TracingLogger::default())
             .app_data(state.clone())
             .route("/health", web::get().to(handlers::health::health))
-            .service(
-                SwaggerUi::new("/swagger-ui/{_:.*}")
-                    .url("/api-docs/openapi.json", openapi.clone()),
-            )
+            .service(SwaggerUi::new("/swagger-ui/{_:.*}").url("/api-docs/openapi.json", openapi.clone()))
             .configure(routes::configure)
     })
     .bind(&addr)?

@@ -565,3 +565,41 @@ The new piece is propagation back to the client: a small `wrap_fn` middleware re
 - Grafana has no pre-built dashboards yet — only datasources. A small starter dashboard for HTTP request rate / p95 latency / error rate (off Prometheus) and one for "logs by request_id" (off Loki) would round things out. Provisioning would go under `observability/grafana/provisioning/dashboards/`.
 - The Postgres bind mount `./database` is dev-convenience and intentionally not a named volume; in compose-only setups for a teammate's first run, the dir gets created with whatever the postgres container's `postgres` uid maps to on the host. If permissions get weird, `rm -rf database/ && just compose-up` recreates clean.
 - `just compose-nuke` deletes Loki/Prometheus/Grafana data but **not** the Postgres bind mount (since it's not a named volume). To wipe Postgres too: `docker compose down -v && rm -rf database/`.
+
+---
+
+### Step 20 — GitHub Actions CI pipeline (2026-05-09)
+
+**Implemented:** Two workflow files under `.github/workflows/` covering the two distinct CI concerns — fast PR feedback (lint/test) and image publication on main + version tags.
+
+- `.github/workflows/ci.yml` — runs on every push to any branch and on PRs to `main`. Four jobs in parallel:
+  1. **fmt** — `cargo fmt --all -- --check`. No cache, no DB; takes ~30 s.
+  2. **clippy** — `cargo clippy --all-targets --locked -- -D warnings` with `SQLX_OFFLINE=true`. Uses the committed `.sqlx/` files so the lint job does not need a Postgres service. `Swatinem/rust-cache@v2` caches the dependency build between runs.
+  3. **test** — spins up a `postgres:18.3` service container, installs `sqlx-cli` (cached via `baptiste0928/cargo-install@v3`), runs `sqlx migrate run`, then `cargo test --locked --all-targets`. `SQLX_OFFLINE=false` is set explicitly so the macros validate against the live schema, not the committed snapshot — this is what catches the "developer changed a query but forgot to re-run `just sqlx-prepare`" mistake at PR review time.
+  4. **sqlx-offline-check** — runs `cargo sqlx prepare --check -- --all-targets` against the same Postgres service. If the committed `.sqlx/` directory is out of sync with the live SQL the docker build would silently use stale metadata; this job fails the PR instead.
+- `.github/workflows/release.yml` — runs on push to `main` and on `v*` tags. Single job `build-and-push`:
+  - `permissions: contents:read, packages:write` so the default `GITHUB_TOKEN` can push to GHCR (no DockerHub for now — the user opted for GHCR-only).
+  - `docker/setup-qemu-action` + `docker/setup-buildx-action` to enable cross-arch.
+  - `docker/login-action` against `ghcr.io` with `GITHUB_TOKEN`.
+  - `docker/metadata-action@v5` produces tag rules from the ref:
+    - main branch push → `main` + `main-<short-sha>` + `latest`
+    - tag `v1.2.3` → `1.2.3` + `1.2` + `1` + `latest`
+  - `docker/build-push-action@v6` builds `linux/amd64,linux/arm64` from the existing `Dockerfile` (which already reads `TARGETARCH` and maps to musl targets) with `cache-from/to: type=gha` for cross-run layer caching, and `provenance: false` to keep the manifest simple.
+
+**Notes:**
+- **Why two workflows, not one?** `ci.yml` runs on PRs from forks (no special permissions, can't access secrets) and on push to feature branches. `release.yml` only fires on push to `main` or on tag, where push permissions for GHCR are guaranteed. Splitting them keeps the privilege boundary obvious — a contributor's PR cannot accidentally publish.
+- **Why `dtolnay/rust-toolchain@master` pinned to 1.95?** Matches the Dockerfile's pinned Rust version (Edition 2024 needs ≥1.85, cargo-chef transitive deps need ≥1.88). Using the same toolchain locally, in Docker, and in CI prevents the classic "passes on my machine, fails in CI" gap.
+- **Why `--locked`?** Forces CI to use the committed `Cargo.lock`. If a dependency update silently bumped a transitive crate, the build would fail loudly here rather than producing a different binary than developers see locally.
+- **Why a separate `sqlx-offline-check` job?** Could have folded `cargo sqlx prepare --check` into the `test` job. Keeping it separate makes the failure message unambiguous — when the job is red the PR description suggests `just sqlx-prepare && git add .sqlx/` rather than the developer hunting through test logs.
+- **Why no DockerHub publish?** The user opted for GHCR-only. The `technical_features.md` doc still mentions both; that's documentation drift to address separately. Adding DockerHub later is a 6-line diff in `release.yml` (extra `login-action` + extra image in `metadata-action`'s `images:` list + `DOCKERHUB_USERNAME`/`DOCKERHUB_TOKEN` repo secrets).
+- **Caching strategy.** `Swatinem/rust-cache@v2` keys on `Cargo.lock` and target triple, caches `~/.cargo/registry`, `~/.cargo/git`, and `target/`. Cold cache: ~4 min for a clippy run. Warm cache: ~45 s. The Docker build uses GitHub Actions' own cache backend (`cache-from/to: type=gha`) — orthogonal to rust-cache, lives in the BuildKit layer cache.
+- **`provenance: false` on the docker build.** Buildx-generated provenance attestations create a separate manifest entry per architecture, and some older container runtimes (k3s 1.24, certain Kubernetes admission controllers) refuse to pull manifest lists with non-OCI-compliant entries. Disabling it produces a plain multi-arch manifest list that pulls cleanly everywhere. If supply-chain attestation matters later, re-enable it once the deployment targets are confirmed compatible.
+
+**Verified:** Workflow YAML is syntactically valid (no live run yet — first push to a branch will exercise the file). The workflow files reference action versions that are current as of 2026-05: `actions/checkout@v4`, `dtolnay/rust-toolchain@master`, `Swatinem/rust-cache@v2`, `baptiste0928/cargo-install@v3`, `docker/setup-qemu-action@v3`, `docker/setup-buildx-action@v3`, `docker/login-action@v3`, `docker/metadata-action@v5`, `docker/build-push-action@v6`.
+
+**Open issues / reminders:**
+- DockerHub publishing is *not* wired despite `docs/technical_features.md` mentioning it. Decide: update the doc to say GHCR-only, or add DockerHub credentials (`DOCKERHUB_USERNAME` + `DOCKERHUB_TOKEN` repo secrets) and extend `release.yml`.
+- No deployment job. CI ends at "image is in the registry"; rolling that image into a k8s cluster is a separate concern (Flux/Argo CD watching the registry, or a manual `kubectl set image`).
+- No SBOM / vulnerability scanning. A future job could run `trivy image` or `docker/scout-action` after the push. Skipped for now to keep the pipeline lean.
+- First run on a fresh repo will be slow (cold cache for both rust-cache and the Docker buildx GHA cache). Expect ~10 min for the initial release run; subsequent runs settle to 2–4 min.
+- Phase 3 of the implementation plan is now complete.

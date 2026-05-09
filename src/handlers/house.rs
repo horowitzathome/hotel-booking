@@ -1,10 +1,10 @@
-use actix_web::{web, HttpResponse};
+use actix_web::{HttpResponse, web};
 use validator::Validate;
 
+use crate::AppState;
 use crate::errors::AppError;
 use crate::models::house::{CreateHouseRequest, UpdateHouseRequest};
 use crate::services::house as svc;
-use crate::AppState;
 
 #[utoipa::path(
     get,
@@ -29,10 +29,7 @@ pub async fn list(state: web::Data<AppState>) -> Result<HttpResponse, AppError> 
         (status = 404, description = "House not found")
     )
 )]
-pub async fn get(
-    state: web::Data<AppState>,
-    path: web::Path<i64>,
-) -> Result<HttpResponse, AppError> {
+pub async fn get(state: web::Data<AppState>, path: web::Path<i64>) -> Result<HttpResponse, AppError> {
     let house = svc::get(&state.pool, path.into_inner()).await?;
     Ok(HttpResponse::Ok().json(house))
 }
@@ -48,16 +45,11 @@ pub async fn get(
         (status = 409, description = "Unknown address_id or manager_id")
     )
 )]
-pub async fn create(
-    state: web::Data<AppState>,
-    body: web::Json<CreateHouseRequest>,
-) -> Result<HttpResponse, AppError> {
+pub async fn create(state: web::Data<AppState>, body: web::Json<CreateHouseRequest>) -> Result<HttpResponse, AppError> {
     body.validate()?;
     let house = svc::create(&state.pool, &body).await?;
     let location = format!("/api/v1/houses/{}", house.id);
-    Ok(HttpResponse::Created()
-        .insert_header(("Location", location))
-        .json(house))
+    Ok(HttpResponse::Created().insert_header(("Location", location)).json(house))
 }
 
 #[utoipa::path(
@@ -73,11 +65,7 @@ pub async fn create(
         (status = 409, description = "Unknown address_id or manager_id")
     )
 )]
-pub async fn update(
-    state: web::Data<AppState>,
-    path: web::Path<i64>,
-    body: web::Json<UpdateHouseRequest>,
-) -> Result<HttpResponse, AppError> {
+pub async fn update(state: web::Data<AppState>, path: web::Path<i64>, body: web::Json<UpdateHouseRequest>) -> Result<HttpResponse, AppError> {
     body.validate()?;
     let house = svc::update(&state.pool, path.into_inner(), &body).await?;
     Ok(HttpResponse::Ok().json(house))
@@ -95,10 +83,7 @@ pub async fn update(
         (status = 409, description = "House is referenced by a booking")
     )
 )]
-pub async fn delete(
-    state: web::Data<AppState>,
-    path: web::Path<i64>,
-) -> Result<HttpResponse, AppError> {
+pub async fn delete(state: web::Data<AppState>, path: web::Path<i64>) -> Result<HttpResponse, AppError> {
     svc::delete(&state.pool, path.into_inner()).await?;
     Ok(HttpResponse::NoContent().finish())
 }

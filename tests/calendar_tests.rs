@@ -102,10 +102,7 @@ async fn delete_blocked_by_active_booking(pool: PgPool) {
 
     // Attempt to delete a range that includes the booked days.
     let result = cal_svc::delete(&pool, house_id, d("2024-07-01"), d("2024-07-10")).await;
-    assert!(
-        matches!(result, Err(AppError::Conflict(_))),
-        "expected Conflict, got {result:?}"
-    );
+    assert!(matches!(result, Err(AppError::Conflict(_))), "expected Conflict, got {result:?}");
 }
 
 // ---------------------------------------------------------------------------
