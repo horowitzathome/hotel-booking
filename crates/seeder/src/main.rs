@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use chrono::NaiveDate;
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use sqlx::PgPool;
 use std::collections::HashSet;
@@ -39,6 +40,13 @@ struct LoadArgs {
     #[arg(long)]
     houses: Option<usize>,
 
+    /// Number of years of calendar entries per house.
+    #[arg(long)]
+    years: Option<u32>,
+    /// Calendar start date (YYYY-MM-DD). Default 2025-01-01 — fixed for reproducibility.
+    #[arg(long)]
+    start_date: Option<NaiveDate>,
+
     /// Run only these steps (comma-separated). Skipped dependencies are read
     /// from the existing rows in the DB. Mutually exclusive with --skip.
     #[arg(long, value_delimiter = ',', conflicts_with = "skip")]
@@ -58,9 +66,10 @@ enum Step {
     Persons,
     Addresses,
     Houses,
+    Calendar,
 }
 
-const ALL_STEPS: &[Step] = &[Step::Countries, Step::Managers, Step::Persons, Step::Addresses, Step::Houses];
+const ALL_STEPS: &[Step] = &[Step::Countries, Step::Managers, Step::Persons, Step::Addresses, Step::Houses, Step::Calendar];
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -94,11 +103,13 @@ async fn reset(pool: &PgPool) -> Result<()> {
 
 async fn load(pool: &PgPool, args: LoadArgs) -> Result<()> {
     // --- volume resolution: explicit flag > preset default ---
-    let (def_managers, def_persons, def_addresses, def_houses) = if args.small { (10, 100, 50, 50) } else { (1_000, 100_000, 10_000, 10_000) };
+    let (def_managers, def_persons, def_addresses, def_houses, def_years) = if args.small { (10, 100, 50, 50, 1) } else { (1_000, 100_000, 10_000, 10_000, 10) };
     let n_managers = args.managers.unwrap_or(def_managers);
     let n_persons = args.persons.unwrap_or(def_persons);
     let n_addresses = args.addresses.unwrap_or(def_addresses);
     let n_houses = args.houses.unwrap_or(def_houses);
+    let years = args.years.unwrap_or(def_years);
+    let start_date = args.start_date.unwrap_or_else(|| NaiveDate::from_ymd_opt(2025, 1, 1).expect("valid default start date"));
 
     // --- step selection ---
     let steps: HashSet<Step> = if !args.only.is_empty() {
@@ -116,10 +127,26 @@ async fn load(pool: &PgPool, args: LoadArgs) -> Result<()> {
     let address_ids = run_or_fetch(pool, Step::Addresses, &steps, "addresses", || seed::addresses::seed(pool, n_addresses, &country_ids)).await?;
     let house_ids = run_or_fetch(pool, Step::Houses, &steps, "houses", || seed::houses::seed(pool, n_houses, &address_ids, &manager_ids)).await?;
 
+    let calendar_count = if steps.contains(&Step::Calendar) {
+        let start = Instant::now();
+        let count = seed::calendar::seed(pool, &house_ids, start_date, years).await?;
+        let elapsed = start.elapsed();
+        let rate = if elapsed.as_secs_f64() > 0.0 { count as f64 / elapsed.as_secs_f64() } else { 0.0 };
+        println!(
+            "{:>10}: {:>10} rows in {:>8.2?}  ({:>10.0} rows/s)  [{} years from {}]",
+            "calendar", count, elapsed, rate, years, start_date
+        );
+        count
+    } else {
+        let (c,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM calendar").fetch_one(pool).await?;
+        println!("{:>10}: {:>10} rows  (skipped — read from DB)", "calendar", c);
+        c as u64
+    };
+
     println!("---");
     println!(
         "total: {} rows in {:.2?}",
-        country_ids.len() + manager_ids.len() + person_ids.len() + address_ids.len() + house_ids.len(),
+        country_ids.len() as u64 + manager_ids.len() as u64 + person_ids.len() as u64 + address_ids.len() as u64 + house_ids.len() as u64 + calendar_count,
         total.elapsed()
     );
     Ok(())
