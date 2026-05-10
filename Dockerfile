@@ -33,8 +33,9 @@ RUN if [ "$TARGETARCH" = "arm64" ]; then \
 
 COPY --from=planner /app/recipe.json recipe.json
 
-# Build dependencies
-RUN cargo chef cook --release --target $(cat /rust_target) --recipe-path recipe.json
+# Build dependencies for the rental-api binary only — keeps loadtest/seeder
+# deps out of the production image and avoids cross-compiling crates we don't ship.
+RUN cargo chef cook --release --target $(cat /rust_target) --bin ${APP_NAME} --recipe-path recipe.json
 
 COPY . .
 ENV SQLX_OFFLINE=true

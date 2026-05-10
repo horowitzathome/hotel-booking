@@ -21,7 +21,8 @@ RUN cargo chef prepare --recipe-path recipe.json
 FROM chef AS builder
 ARG APP_NAME
 COPY --from=planner /app/recipe.json recipe.json
-RUN cargo chef cook --release --recipe-path recipe.json
+# Cook only the deps for the rental-api binary — leaves loadtest/seeder out of the image.
+RUN cargo chef cook --release --bin ${APP_NAME} --recipe-path recipe.json
 
 COPY . .
 ENV SQLX_OFFLINE=true

@@ -5,8 +5,14 @@ words:
   - distroless
   - dotenv
   - dotenvy
+  - goose
+  - hatch
+  - loadtest
+  - nocapture
   - postgres
+  - seeder
   - serde
   - sqlx
   - thiserror
   - tokio
+  - utoipa

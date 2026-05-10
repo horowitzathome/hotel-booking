@@ -1,0 +1,15 @@
+[package]
+name = "loadtest"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "loadtest"
+path = "src/main.rs"
+
+[dependencies]
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+goose = { version = "0.17", default-features = false, features = ["rustls-tls"] }

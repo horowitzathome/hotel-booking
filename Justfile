@@ -220,6 +220,24 @@ seed-skip steps:
 seed-verify:
     cargo run --release -p seeder -- verify
 
+# --- Load test (goose) — requires the API to be running on localhost:8080 ---
+
+# Show goose's CLI options (host, users, hatch-rate, run-time, report-file, ...)
+loadtest-help:
+    cargo run --release -p loadtest -- --help
+
+# Quick smoke test: 5 users for 10 s
+loadtest-smoke:
+    cargo run --release -p loadtest -- --users 5 --hatch-rate 5 --run-time 10s --no-reset-metrics
+
+# Baseline run: 50 users for 1 min, HTML report at loadtest-report.html
+loadtest-baseline:
+    cargo run --release -p loadtest -- --users 50 --hatch-rate 10 --run-time 1m --report-file loadtest-report.html
+
+# Free-form passthrough: `just loadtest --users 200 --run-time 5m --report-file out.html`
+loadtest *args:
+    cargo run --release -p loadtest -- {{ args }}
+
 # CURL Test Commands
 
 # API Health
