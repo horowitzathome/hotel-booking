@@ -60,40 +60,57 @@ run-dev:
 run-prod:
     cargo run --release
 
-# Run all tests
+# Run all tests across the workspace
 test:
-    cargo test
+    cargo test --workspace
 
 # Run tests with output visible
 test-verbose:
-    cargo test -- --nocapture
+    cargo test --workspace -- --nocapture
 
 # Run a single test by name (usage: just test-one name=my_test)
 test-one name:
-    cargo test {{ name }}
+    cargo test --workspace {{ name }}
 
 # Run tests for a specific module (usage: just test-mod mod=services::booking)
 test-mod mod:
-    cargo test {{ mod }}
+    cargo test --workspace {{ mod }}
 
-# Build dev
-build: 
-    cargo build
+# --- Build / lint / format (workspace-wide) ---
 
-# Build release
-build-release: 
-    cargo build --release
+# Build all workspace members in dev profile
+build:
+    cargo build --workspace
 
-# Run clippy then all tests
-check: lint test
+# Build all workspace members in release profile
+build-release:
+    cargo build --workspace --release
 
-# Run clippy
+# Build a single package, e.g. `just build-pkg pkg=seeder`
+build-pkg pkg:
+    cargo build -p {{ pkg }}
+
+# Build a single package in release, e.g. `just build-pkg-release pkg=rental-api`
+build-pkg-release pkg:
+    cargo build -p {{ pkg }} --release
+
+# Clippy across the whole workspace, including tests/benches/examples — fails on any warning
 lint:
-    cargo clippy -- -D warnings
+    cargo clippy --workspace --all-targets -- -D warnings
 
-# Format code
+# Format every crate in the workspace
 fmt:
-    cargo fmt
+    cargo fmt --all
+
+# Verify formatting without writing — for CI / pre-commit
+fmt-check:
+    cargo fmt --all -- --check
+
+# Pre-commit gate: format check + clippy + tests (tests require a running Postgres)
+check: fmt-check lint test
+
+# Same as `check` but also rebuilds in release — closer to what CI does
+ci: fmt-check lint build-release test
 
 # --- Observability: Jaeger (OTLP traces) ---
 
@@ -203,7 +220,7 @@ seed-skip steps:
 seed-verify:
     cargo run --release -p seeder -- verify
 
-# CURL Test Commandsjust 
+# CURL Test Commands
 
 # API Health
 api-health:

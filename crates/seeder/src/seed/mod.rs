@@ -1,4 +1,5 @@
 pub mod addresses;
+pub mod bookings;
 pub mod calendar;
 pub mod countries;
 pub mod houses;

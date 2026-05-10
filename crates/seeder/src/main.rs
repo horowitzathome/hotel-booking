@@ -46,6 +46,9 @@ struct LoadArgs {
     /// Calendar start date (YYYY-MM-DD). Default 2025-01-01 — fixed for reproducibility.
     #[arg(long)]
     start_date: Option<NaiveDate>,
+    /// Approximate number of bookings to generate (spread across all houses).
+    #[arg(long)]
+    bookings: Option<usize>,
 
     /// Run only these steps (comma-separated). Skipped dependencies are read
     /// from the existing rows in the DB. Mutually exclusive with --skip.
@@ -67,9 +70,10 @@ enum Step {
     Addresses,
     Houses,
     Calendar,
+    Bookings,
 }
 
-const ALL_STEPS: &[Step] = &[Step::Countries, Step::Managers, Step::Persons, Step::Addresses, Step::Houses, Step::Calendar];
+const ALL_STEPS: &[Step] = &[Step::Countries, Step::Managers, Step::Persons, Step::Addresses, Step::Houses, Step::Calendar, Step::Bookings];
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -103,12 +107,13 @@ async fn reset(pool: &PgPool) -> Result<()> {
 
 async fn load(pool: &PgPool, args: LoadArgs) -> Result<()> {
     // --- volume resolution: explicit flag > preset default ---
-    let (def_managers, def_persons, def_addresses, def_houses, def_years) = if args.small { (10, 100, 50, 50, 1) } else { (1_000, 100_000, 10_000, 10_000, 10) };
+    let (def_managers, def_persons, def_addresses, def_houses, def_years, def_bookings) = if args.small { (10, 100, 50, 50, 1, 200) } else { (1_000, 100_000, 10_000, 10_000, 10, 500_000) };
     let n_managers = args.managers.unwrap_or(def_managers);
     let n_persons = args.persons.unwrap_or(def_persons);
     let n_addresses = args.addresses.unwrap_or(def_addresses);
     let n_houses = args.houses.unwrap_or(def_houses);
     let years = args.years.unwrap_or(def_years);
+    let n_bookings = args.bookings.unwrap_or(def_bookings);
     let start_date = args.start_date.unwrap_or_else(|| NaiveDate::from_ymd_opt(2025, 1, 1).expect("valid default start date"));
 
     // --- step selection ---
@@ -143,10 +148,23 @@ async fn load(pool: &PgPool, args: LoadArgs) -> Result<()> {
         c as u64
     };
 
+    let bookings_count = if steps.contains(&Step::Bookings) {
+        let start = Instant::now();
+        let count = seed::bookings::seed(pool, &house_ids, &person_ids, start_date, years, n_bookings).await?;
+        let elapsed = start.elapsed();
+        let rate = if elapsed.as_secs_f64() > 0.0 { count as f64 / elapsed.as_secs_f64() } else { 0.0 };
+        println!("{:>10}: {:>10} rows in {:>8.2?}  ({:>10.0} rows/s)  [target {}]", "bookings", count, elapsed, rate, n_bookings);
+        count
+    } else {
+        let (c,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM bookings").fetch_one(pool).await?;
+        println!("{:>10}: {:>10} rows  (skipped — read from DB)", "bookings", c);
+        c as u64
+    };
+
     println!("---");
     println!(
         "total: {} rows in {:.2?}",
-        country_ids.len() as u64 + manager_ids.len() as u64 + person_ids.len() as u64 + address_ids.len() as u64 + house_ids.len() as u64 + calendar_count,
+        country_ids.len() as u64 + manager_ids.len() as u64 + person_ids.len() as u64 + address_ids.len() as u64 + house_ids.len() as u64 + calendar_count + bookings_count,
         total.elapsed()
     );
     Ok(())
