@@ -226,13 +226,16 @@ seed-verify:
 loadtest-help:
     cargo run --release -p loadtest -- --help
 
-# Quick smoke test: 5 users for 10 s
+# Quick smoke test: 5 users for 10 s — assumes seeded DB
 loadtest-smoke:
     cargo run --release -p loadtest -- --users 5 --hatch-rate 5 --run-time 10s --no-reset-metrics
 
-# Baseline run: 50 users for 1 min, HTML report at loadtest-report.html
+# Baseline (read-only mix): 50 users for 1 min — assumes seeded DB. Re-runnable.
 loadtest-baseline:
     cargo run --release -p loadtest -- --users 50 --hatch-rate 10 --run-time 1m --report-file loadtest-report.html
+
+# Headline run: reseed from scratch then run baseline (slow: ~12 min seed + 1 min test)
+loadtest-fresh: seed-fresh loadtest-baseline
 
 # Free-form passthrough: `just loadtest --users 200 --run-time 5m --report-file out.html`
 loadtest *args:
