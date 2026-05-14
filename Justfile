@@ -167,7 +167,7 @@ compose-nuke:
 # Commit the resulting .sqlx/ directory so `cargo build` can run with SQLX_OFFLINE=true
 # (i.e. inside the Docker builder stage, where no DB is reachable).
 sqlx-prepare:
-    cargo sqlx prepare -- --all-targets
+    cargo sqlx prepare --workspace -- --all-targets  
 
 # --- Docker image (multi-stage cargo-chef + distroless) ---
 
