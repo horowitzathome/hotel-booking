@@ -237,6 +237,14 @@ loadtest-baseline:
 # Headline run: reseed from scratch then run baseline (slow: ~12 min seed + 1 min test)
 loadtest-fresh: seed-fresh loadtest-baseline
 
+# Read + write mix (record_payment, create_booking). Each run consumes some unpaid
+# bookings + free windows, so reseed every few runs for a clean baseline.
+loadtest-write:
+    cargo run --release -p loadtest -- --users 50 --hatch-rate 10 --run-time 3m --report-file loadtest-report-write.html
+
+# Reseed + read+write mix in one shot.
+loadtest-write-fresh: seed-fresh loadtest-write
+
 # Free-form passthrough: `just loadtest --users 200 --run-time 5m --report-file out.html`
 loadtest *args:
     cargo run --release -p loadtest -- {{ args }}

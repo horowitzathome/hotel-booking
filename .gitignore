@@ -2,4 +2,5 @@
 .env
 /database/
 .sqlx/
+.DS_Store
 
