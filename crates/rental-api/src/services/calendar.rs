@@ -19,25 +19,30 @@ fn validate_date_range(from: NaiveDate, to: NaiveDate) -> Result<(), AppError> {
     Ok(())
 }
 
+#[tracing::instrument(skip(pool), fields(layer = "service"))]
 pub async fn list(pool: &PgPool, house_id: i64, from: Option<NaiveDate>, to: Option<NaiveDate>) -> Result<Vec<CalendarEntry>, AppError> {
     repo::find_all(pool, house_id, from, to).await
 }
 
+#[tracing::instrument(skip(pool), fields(layer = "service"))]
 pub async fn get(pool: &PgPool, house_id: i64, id: i64) -> Result<CalendarEntry, AppError> {
     repo::find_by_id(pool, house_id, id).await
 }
 
+#[tracing::instrument(skip(pool, req), fields(layer = "service"))]
 pub async fn create(pool: &PgPool, house_id: i64, req: &CreateCalendarRequest) -> Result<Vec<CalendarEntry>, AppError> {
     validate_create_status(req.status)?;
     validate_date_range(req.from, req.to)?;
     repo::create(pool, house_id, req).await
 }
 
+#[tracing::instrument(skip(pool, req), fields(layer = "service"))]
 pub async fn update_price(pool: &PgPool, house_id: i64, req: &UpdateCalendarPriceRequest) -> Result<Vec<CalendarEntry>, AppError> {
     validate_date_range(req.from, req.to)?;
     repo::update_price(pool, house_id, req).await
 }
 
+#[tracing::instrument(skip(pool), fields(layer = "service"))]
 pub async fn delete(pool: &PgPool, house_id: i64, from: NaiveDate, to: NaiveDate) -> Result<(), AppError> {
     validate_date_range(from, to)?;
     repo::delete(pool, house_id, from, to).await

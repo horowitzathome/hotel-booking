@@ -131,8 +131,8 @@ pub async fn create(pool: &PgPool, req: &CreateBookingRequest) -> Result<(Bookin
         return Err(AppError::UnprocessableEntity("all days in range must be in status 'Rentable'".into()));
     }
 
-    let from_calendar_id = entries.first().unwrap().id;
-    let to_calendar_id = entries.last().unwrap().id;
+    let from_calendar_id = entries.first().expect("invariant: entries non-empty after length check").id;
+    let to_calendar_id = entries.last().expect("invariant: entries non-empty after length check").id;
     let expected_total_price: Decimal = entries.iter().map(|e| e.price).sum();
 
     let booking_id: i64 = sqlx::query_scalar!(

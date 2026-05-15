@@ -3,11 +3,13 @@ use sqlx::PgPool;
 use crate::errors::AppError;
 use crate::models::country::{Country, CreateCountryRequest, UpdateCountryRequest};
 
+#[tracing::instrument(skip(pool), fields(layer = "repository"))]
 pub async fn find_all(pool: &PgPool) -> Result<Vec<Country>, AppError> {
     let rows = sqlx::query_as!(Country, "SELECT id, name, iso_code FROM countries ORDER BY name").fetch_all(pool).await?;
     Ok(rows)
 }
 
+#[tracing::instrument(skip(pool), fields(layer = "repository"))]
 pub async fn find_by_id(pool: &PgPool, id: i64) -> Result<Country, AppError> {
     sqlx::query_as!(Country, "SELECT id, name, iso_code FROM countries WHERE id = $1", id)
         .fetch_one(pool)
@@ -18,6 +20,7 @@ pub async fn find_by_id(pool: &PgPool, id: i64) -> Result<Country, AppError> {
         })
 }
 
+#[tracing::instrument(skip(pool, req), fields(layer = "repository"))]
 pub async fn create(pool: &PgPool, req: &CreateCountryRequest) -> Result<Country, AppError> {
     sqlx::query_as!(Country, "INSERT INTO countries (name, iso_code) VALUES ($1, $2) RETURNING id, name, iso_code", req.name, req.iso_code,)
         .fetch_one(pool)
@@ -25,6 +28,7 @@ pub async fn create(pool: &PgPool, req: &CreateCountryRequest) -> Result<Country
         .map_err(AppError::from)
 }
 
+#[tracing::instrument(skip(pool, req), fields(layer = "repository"))]
 pub async fn update(pool: &PgPool, id: i64, req: &UpdateCountryRequest) -> Result<Country, AppError> {
     sqlx::query_as!(
         Country,
@@ -41,6 +45,7 @@ pub async fn update(pool: &PgPool, id: i64, req: &UpdateCountryRequest) -> Resul
     })
 }
 
+#[tracing::instrument(skip(pool), fields(layer = "repository"))]
 pub async fn delete(pool: &PgPool, id: i64) -> Result<(), AppError> {
     let result = sqlx::query!("DELETE FROM countries WHERE id = $1", id).execute(pool).await?;
     if result.rows_affected() == 0 {

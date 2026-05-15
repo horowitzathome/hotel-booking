@@ -1,4 +1,14 @@
+use chrono::NaiveDate;
+use rust_decimal::Decimal;
 use sqlx::PgPool;
+
+pub fn d(s: &str) -> NaiveDate {
+    NaiveDate::parse_from_str(s, "%Y-%m-%d").unwrap()
+}
+
+pub fn price(cents: i64) -> Decimal {
+    Decimal::new(cents, 2)
+}
 
 /// Creates the full hierarchy required by a house: country → address → manager → house.
 /// Returns the house id.

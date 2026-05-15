@@ -4,6 +4,7 @@ use sqlx::PgPool;
 use crate::errors::AppError;
 use crate::models::calendar::{CalendarEntry, CalendarStatus, CreateCalendarRequest, UpdateCalendarPriceRequest};
 
+#[tracing::instrument(skip(pool), fields(layer = "repository"))]
 pub async fn find_all(pool: &PgPool, house_id: i64, from: Option<NaiveDate>, to: Option<NaiveDate>) -> Result<Vec<CalendarEntry>, AppError> {
     let rows = sqlx::query!(
         r#"
@@ -33,6 +34,7 @@ pub async fn find_all(pool: &PgPool, house_id: i64, from: Option<NaiveDate>, to:
         .collect())
 }
 
+#[tracing::instrument(skip(pool), fields(layer = "repository"))]
 pub async fn find_by_id(pool: &PgPool, house_id: i64, id: i64) -> Result<CalendarEntry, AppError> {
     let row = sqlx::query!(
         r#"SELECT id, date, status AS "status: CalendarStatus", price FROM calendar WHERE id = $1 AND house_id = $2"#,
@@ -54,6 +56,7 @@ pub async fn find_by_id(pool: &PgPool, house_id: i64, id: i64) -> Result<Calenda
     })
 }
 
+#[tracing::instrument(skip(pool, req), fields(layer = "repository"))]
 pub async fn create(pool: &PgPool, house_id: i64, req: &CreateCalendarRequest) -> Result<Vec<CalendarEntry>, AppError> {
     let mut tx = pool.begin().await.map_err(AppError::from)?;
     let mut created = Vec::new();
@@ -92,6 +95,7 @@ pub async fn create(pool: &PgPool, house_id: i64, req: &CreateCalendarRequest) -
     Ok(created)
 }
 
+#[tracing::instrument(skip(pool, req), fields(layer = "repository"))]
 pub async fn update_price(pool: &PgPool, house_id: i64, req: &UpdateCalendarPriceRequest) -> Result<Vec<CalendarEntry>, AppError> {
     let mut rows = sqlx::query!(
         r#"
@@ -122,8 +126,8 @@ pub async fn update_price(pool: &PgPool, house_id: i64, req: &UpdateCalendarPric
         .collect())
 }
 
+#[tracing::instrument(skip(pool), fields(layer = "repository"))]
 pub async fn delete(pool: &PgPool, house_id: i64, from: NaiveDate, to: NaiveDate) -> Result<(), AppError> {
-    // Check if any entry in the range belongs to a non-cancelled booking
     let count = sqlx::query_scalar!(
         r#"
         SELECT COUNT(*)

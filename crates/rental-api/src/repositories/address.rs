@@ -4,6 +4,7 @@ use crate::errors::AppError;
 use crate::models::address::{Address, CreateAddressRequest, UpdateAddressRequest};
 use crate::models::country::Country;
 
+#[tracing::instrument(skip(pool), fields(layer = "repository"))]
 pub async fn find_by_id(pool: &PgPool, id: i64) -> Result<Address, AppError> {
     let row = sqlx::query!(
         r#"
@@ -39,6 +40,7 @@ pub async fn find_by_id(pool: &PgPool, id: i64) -> Result<Address, AppError> {
     })
 }
 
+#[tracing::instrument(skip(pool, req), fields(layer = "repository"))]
 pub async fn create(pool: &PgPool, req: &CreateAddressRequest) -> Result<Address, AppError> {
     let id: i64 = sqlx::query_scalar!(
         "INSERT INTO addresses (street, number, postcode, city, province, country_id) \
@@ -57,6 +59,7 @@ pub async fn create(pool: &PgPool, req: &CreateAddressRequest) -> Result<Address
     find_by_id(pool, id).await
 }
 
+#[tracing::instrument(skip(pool, req), fields(layer = "repository"))]
 pub async fn update(pool: &PgPool, id: i64, req: &UpdateAddressRequest) -> Result<Address, AppError> {
     let rows = sqlx::query!(
         "UPDATE addresses \
@@ -81,6 +84,7 @@ pub async fn update(pool: &PgPool, id: i64, req: &UpdateAddressRequest) -> Resul
     find_by_id(pool, id).await
 }
 
+#[tracing::instrument(skip(pool), fields(layer = "repository"))]
 pub async fn delete(pool: &PgPool, id: i64) -> Result<(), AppError> {
     let result = sqlx::query!("DELETE FROM addresses WHERE id = $1", id).execute(pool).await?;
     if result.rows_affected() == 0 {

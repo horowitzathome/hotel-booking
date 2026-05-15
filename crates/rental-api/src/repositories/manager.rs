@@ -3,6 +3,7 @@ use sqlx::PgPool;
 use crate::errors::AppError;
 use crate::models::manager::{CreateManagerRequest, Manager, UpdateManagerRequest};
 
+#[tracing::instrument(skip(pool), fields(layer = "repository"))]
 pub async fn find_all(pool: &PgPool) -> Result<Vec<Manager>, AppError> {
     let rows = sqlx::query_as!(Manager, "SELECT id, first_name, last_name, email, phone FROM managers ORDER BY last_name, first_name")
         .fetch_all(pool)
@@ -10,6 +11,7 @@ pub async fn find_all(pool: &PgPool) -> Result<Vec<Manager>, AppError> {
     Ok(rows)
 }
 
+#[tracing::instrument(skip(pool), fields(layer = "repository"))]
 pub async fn find_by_id(pool: &PgPool, id: i64) -> Result<Manager, AppError> {
     sqlx::query_as!(Manager, "SELECT id, first_name, last_name, email, phone FROM managers WHERE id = $1", id)
         .fetch_one(pool)
@@ -20,6 +22,7 @@ pub async fn find_by_id(pool: &PgPool, id: i64) -> Result<Manager, AppError> {
         })
 }
 
+#[tracing::instrument(skip(pool, req), fields(layer = "repository"))]
 pub async fn create(pool: &PgPool, req: &CreateManagerRequest) -> Result<Manager, AppError> {
     sqlx::query_as!(
         Manager,
@@ -36,6 +39,7 @@ pub async fn create(pool: &PgPool, req: &CreateManagerRequest) -> Result<Manager
     .map_err(AppError::from)
 }
 
+#[tracing::instrument(skip(pool, req), fields(layer = "repository"))]
 pub async fn update(pool: &PgPool, id: i64, req: &UpdateManagerRequest) -> Result<Manager, AppError> {
     sqlx::query_as!(
         Manager,
@@ -57,6 +61,7 @@ pub async fn update(pool: &PgPool, id: i64, req: &UpdateManagerRequest) -> Resul
     })
 }
 
+#[tracing::instrument(skip(pool), fields(layer = "repository"))]
 pub async fn delete(pool: &PgPool, id: i64) -> Result<(), AppError> {
     let result = sqlx::query!("DELETE FROM managers WHERE id = $1", id).execute(pool).await?;
     if result.rows_affected() == 0 {

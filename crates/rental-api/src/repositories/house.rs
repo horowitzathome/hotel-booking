@@ -6,6 +6,7 @@ use crate::models::country::Country;
 use crate::models::house::{CreateHouseRequest, House, UpdateHouseRequest};
 use crate::models::manager::Manager;
 
+#[tracing::instrument(skip(pool), fields(layer = "repository"))]
 pub async fn find_all(pool: &PgPool) -> Result<Vec<House>, AppError> {
     let rows = sqlx::query!(
         r#"
@@ -68,6 +69,7 @@ pub async fn find_all(pool: &PgPool) -> Result<Vec<House>, AppError> {
         .collect())
 }
 
+#[tracing::instrument(skip(pool), fields(layer = "repository"))]
 pub async fn find_by_id(pool: &PgPool, id: i64) -> Result<House, AppError> {
     let row = sqlx::query!(
         r#"
@@ -131,6 +133,7 @@ pub async fn find_by_id(pool: &PgPool, id: i64) -> Result<House, AppError> {
     })
 }
 
+#[tracing::instrument(skip(pool, req), fields(layer = "repository"))]
 pub async fn create(pool: &PgPool, req: &CreateHouseRequest) -> Result<House, AppError> {
     let id: i64 = sqlx::query_scalar!(
         "INSERT INTO houses (name, description, address_id, manager_id) \
@@ -147,6 +150,7 @@ pub async fn create(pool: &PgPool, req: &CreateHouseRequest) -> Result<House, Ap
     find_by_id(pool, id).await
 }
 
+#[tracing::instrument(skip(pool, req), fields(layer = "repository"))]
 pub async fn update(pool: &PgPool, id: i64, req: &UpdateHouseRequest) -> Result<House, AppError> {
     let rows = sqlx::query!(
         "UPDATE houses \
@@ -169,6 +173,7 @@ pub async fn update(pool: &PgPool, id: i64, req: &UpdateHouseRequest) -> Result<
     find_by_id(pool, id).await
 }
 
+#[tracing::instrument(skip(pool), fields(layer = "repository"))]
 pub async fn delete(pool: &PgPool, id: i64) -> Result<(), AppError> {
     let result = sqlx::query!("DELETE FROM houses WHERE id = $1", id).execute(pool).await?;
     if result.rows_affected() == 0 {
