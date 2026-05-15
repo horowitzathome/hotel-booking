@@ -1,4 +1,8 @@
-# This file contains the steps to code the program
+# Implementation Plan — Historical Development Log
+
+> **Read-only historical record.** This document captures the original build plan (Phases 1–3, Steps 1–21) and per-session implementation notes. It is not maintained going forward. The canonical architecture reference is [`docs/system-design.md`](system-design.md). Open issues listed here should be tracked as GitHub issues.
+>
+> The document title below is the original heading.
 
 ## Phase 1 — Project Skeleton
 

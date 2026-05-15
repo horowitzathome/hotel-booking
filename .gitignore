@@ -3,4 +3,5 @@
 /database/
 .sqlx/
 .DS_Store
+.scratch/
 
