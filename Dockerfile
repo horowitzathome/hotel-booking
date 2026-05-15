@@ -6,9 +6,10 @@ ARG APP_NAME=rental-api
 # ---- chef base ----
 FROM --platform=$BUILDPLATFORM rust:${RUST_VERSION}-slim-bookworm AS chef
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl ca-certificates musl-tools clang \
+    ca-certificates python3 python3-pip \
     && rm -rf /var/lib/apt/lists/* \
-    && cargo install cargo-chef --locked
+    && pip3 install ziglang --break-system-packages \
+    && cargo install cargo-chef cargo-zigbuild --locked
 
 WORKDIR /app
 
@@ -21,7 +22,7 @@ RUN cargo chef prepare --recipe-path recipe.json
 FROM chef AS builder
 ARG APP_NAME
 # This ARG is automatically filled by Docker based on your computer
-ARG TARGETARCH 
+ARG TARGETARCH
 
 # Map Docker arch names to Rust target names
 RUN if [ "$TARGETARCH" = "arm64" ]; then \
@@ -33,15 +34,12 @@ RUN if [ "$TARGETARCH" = "arm64" ]; then \
 
 COPY --from=planner /app/recipe.json recipe.json
 
-# Build dependencies for the rental-api binary only — keeps loadtest/seeder
-# deps out of the production image and avoids cross-compiling crates we don't ship.
-RUN cargo chef cook --release --target $(cat /rust_target) --bin ${APP_NAME} --recipe-path recipe.json
+RUN cargo chef cook --zigbuild --release --target $(cat /rust_target) --recipe-path recipe.json
 
 COPY . .
 ENV SQLX_OFFLINE=true
 
-# Build the final binary
-RUN cargo build --release --target $(cat /rust_target) --bin ${APP_NAME} \
+RUN cargo zigbuild --release --target $(cat /rust_target) --bin ${APP_NAME} \
     && cp target/$(cat /rust_target)/release/${APP_NAME} /app/server
 
 # ---- runtime ----
@@ -53,6 +51,6 @@ COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 ENV APP_ENV=production \
     SERVER_HOST=0.0.0.0 \
     SERVER_PORT=8080
-    
+
 EXPOSE 8080
 ENTRYPOINT ["/app/server"]
