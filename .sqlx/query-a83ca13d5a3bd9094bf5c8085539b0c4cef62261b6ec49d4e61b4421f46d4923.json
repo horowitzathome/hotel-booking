@@ -1,0 +1,27 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO bookings (house_id, person_id, from_calendar_id, to_calendar_id, from_date, to_date, status)\n        VALUES ($1, $2, $3, $4, $5, $6, 'Active')\n        RETURNING id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8",
+        "Int8",
+        "Int8",
+        "Date",
+        "Date"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "a83ca13d5a3bd9094bf5c8085539b0c4cef62261b6ec49d4e61b4421f46d4923"
+}

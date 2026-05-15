@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE bookings SET status = 'Cancelled', paid_at = NULL, total_paid = NULL WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6bb84e77854f30e66d0323d3e4d9fd71da132d557a58b3402e85fa6f13dd8fe0"
+}

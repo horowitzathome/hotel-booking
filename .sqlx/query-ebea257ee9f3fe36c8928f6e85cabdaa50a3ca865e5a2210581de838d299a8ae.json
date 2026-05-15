@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT COUNT(*)\n        FROM calendar c\n        JOIN bookings b       ON b.house_id         = c.house_id\n        JOIN calendar c_from  ON c_from.id          = b.from_calendar_id\n        JOIN calendar c_to    ON c_to.id            = b.to_calendar_id\n        WHERE c.house_id = $1\n          AND c.date BETWEEN $2 AND $3\n          AND b.status != 'Cancelled'\n          AND c.date BETWEEN c_from.date AND c_to.date\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Date",
+        "Date"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "ebea257ee9f3fe36c8928f6e85cabdaa50a3ca865e5a2210581de838d299a8ae"
+}

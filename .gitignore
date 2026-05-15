@@ -1,7 +1,7 @@
 /target
 .env
 /database/
-.sqlx/
 .DS_Store
 .scratch/
+loadtest-report*.html
 

@@ -1,0 +1,65 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO calendar (house_id, date, status, price)\n            VALUES ($1, $2, $3, $4)\n            ON CONFLICT (house_id, date) DO NOTHING\n            RETURNING id, date, status AS \"status: CalendarStatus\", price\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "date",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 2,
+        "name": "status: CalendarStatus",
+        "type_info": {
+          "Custom": {
+            "name": "calendar_status",
+            "kind": {
+              "Enum": [
+                "NotRentable",
+                "Rentable",
+                "Rented"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "price",
+        "type_info": "Numeric"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Date",
+        {
+          "Custom": {
+            "name": "calendar_status",
+            "kind": {
+              "Enum": [
+                "NotRentable",
+                "Rentable",
+                "Rented"
+              ]
+            }
+          }
+        },
+        "Numeric"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "7ba5cab25adedfecd19fbca9a0ead755a83fc3ed3c94f3226ad43ba1804e32b7"
+}

@@ -51,19 +51,19 @@ in Jaeger / Tempo.
 To debug a single subsystem, override at runtime:
 
 ```
-RUST_LOG=info,sqlx=debug,claude_test::repositories::booking=trace
+RUST_LOG=info,sqlx=debug,rental_api::repositories::booking=trace
 ```
 
 ### Correlating a log line with a trace
 
 Every log line emitted inside an HTTP request inherits the span fields, including
-`request_id`. To find every log for one request:
+`request_id`. To find every log for one request (Loki/LogQL):
 
 ```
 {app="rental-api"} | json | request_id="d7b0b113-33ec-415e-9c3e-b0e218226021"
 ```
 
-(Loki/LogQL — adjust for Kibana/Elasticsearch.)
+See [`dev_infos.md`](dev_infos.md) for Loki curl queries and Grafana Explore instructions.
 
 ---
 
@@ -71,11 +71,27 @@ Every log line emitted inside an HTTP request inherits the span fields, includin
 
 `actix-web-prom` exposes Prometheus-format text at `GET /metrics`. Standard
 `http_requests_total`, `http_requests_duration_seconds_bucket` etc. labelled by
-`endpoint`, `method`, `status`. Scrape from Prometheus / Grafana Agent on a
-reasonable interval (15s is fine).
+`endpoint`, `method`, `status`. Scrape on a 15 s interval (Prometheus or Grafana Agent).
 
 The endpoint is intentionally unauthenticated and lives at the root, not under
 `/api/v1/`. If exposing publicly, gate it at the ingress.
+
+### Key PromQL queries
+
+```promql
+# Per-endpoint request rate (1 min window)
+sum by (endpoint, status) (rate(http_requests_total[1m]))
+
+# p95 latency by endpoint (5 min window)
+histogram_quantile(0.95,
+  sum by (le, endpoint) (rate(http_requests_duration_seconds_bucket[5m])))
+
+# Process RSS
+process_resident_memory_bytes{job="rental-api"}
+```
+
+These work in the Prometheus UI (`Graph` tab) at `http://localhost:9090` when the
+full compose stack is running, and in Grafana's Prometheus datasource under **Explore**.
 
 ---
 
@@ -84,22 +100,22 @@ The endpoint is intentionally unauthenticated and lives at the root, not under
 ### What you get
 
 `tracing-actix-web` opens a root span per HTTP request — `GET /api/v1/bookings`,
-`POST /api/v1/bookings`, etc. — annotated with HTTP metadata. Service and
-repository functions add `#[tracing::instrument]` so each call becomes a child
-span. Example trace tree for `GET /api/v1/bookings`:
+`POST /api/v1/bookings`, etc. — annotated with HTTP metadata. All service and
+repository functions are instrumented with `#[tracing::instrument]`, so each call
+becomes a child span. Example trace tree for `GET /api/v1/bookings`:
 
 ```
 GET /api/v1/bookings        (tracing-actix-web root span)
-└── list                    (services::booking::list)
-    └── find_all            (repositories::booking::find_all — wraps the SQL query)
+└── list                    (services::booking::list,  layer=service)
+    └── find_all            (repositories::booking::find_all,  layer=repository)
 ```
 
 For `POST /api/v1/bookings` you additionally see the transactional repository
 work and the calendar flip.
 
-Currently the booking domain (services + repositories) is fully instrumented; to
-extend coverage to other domains, add `#[tracing::instrument(skip(pool), fields(layer = "service"))]`
-(or `layer = "repository"`) to the relevant `pub async fn` items.
+Every domain (countries, addresses, managers, persons, houses, calendar, bookings)
+emits service and repository spans. The `layer` field on each span lets you filter
+in Jaeger by `layer=service` or `layer=repository` to isolate the overhead tier.
 
 ### Configuration
 
@@ -113,28 +129,52 @@ Span batching is handled by the SDK (`SdkTracerProvider::with_batch_exporter`).
 On graceful shutdown the app calls `provider.shutdown()` so in-flight spans are
 flushed; if the process is hard-killed, the last batch is lost.
 
-### Local stack (Jaeger all-in-one)
+### Local stack — Jaeger standalone (traces only)
 
-A `Justfile` target brings up Jaeger:
-
-```
-just obs-up      # docker run jaegertracing/all-in-one (UI :16686, OTLP/gRPC :4317, OTLP/HTTP :4318)
+```bash
+just obs-up      # docker run jaegertracing/all-in-one (UI :16686, OTLP/gRPC :4317)
 just obs-down    # stop + remove
 just obs-logs    # tail container logs
 ```
 
-Then point the app at it and run as usual:
+Then point the app at it:
 
-```
+```bash
 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 cargo run
 ```
 
-Or uncomment the `OTEL_EXPORTER_OTLP_ENDPOINT` line in `.env`.
-
 Open `http://localhost:16686`, pick **Service: rental-api**, click **Find Traces**.
-Each row is one HTTP request; clicking it shows the nested span timeline (root
-HTTP span → service span → repository span → individual SQL queries if you
-instrument those too).
+Each row is one HTTP request; clicking it shows the nested span timeline.
+
+### Local stack — full compose (traces + logs + metrics + Grafana)
+
+`just compose-up` starts the complete stack in Docker Compose: app, Postgres, Jaeger,
+Loki, Promtail, Prometheus, and Grafana. All signals are wired together automatically.
+
+```bash
+just compose-up           # build app image + start all services
+just compose-logs         # tail app logs
+just compose-ps           # show running services
+just compose-down         # stop (data volumes preserved)
+just compose-nuke         # stop + delete all named volumes (Loki/Prometheus/Grafana data)
+```
+
+Local URLs once `compose-up` is running:
+
+| Service | URL | Notes |
+|---|---|---|
+| App — Swagger UI | http://localhost:8080/swagger-ui/ | Interactive OpenAPI explorer |
+| App — health | http://localhost:8080/health | Returns `{"status":"ok"}` |
+| App — metrics | http://localhost:8080/metrics | Prometheus text format |
+| Grafana | http://localhost:3000 | Anonymous Admin — no login required (dev only) |
+| Prometheus UI | http://localhost:9090 | `Status → Targets` to verify scrape health |
+| Loki API | http://localhost:3100 | No UI — query via Grafana Explore or curl |
+| Jaeger UI | http://localhost:16686 | Search service `rental-api` |
+
+Grafana provisions three datasources on first boot (Prometheus, Loki, Jaeger) with no
+additional setup. Open **Explore**, select a datasource, and start querying.
+See [`dev_infos.md`](dev_infos.md) for curl-based queries against each service and a
+step-by-step workflow for tracing one request through all three signals.
 
 ### Production stack
 
@@ -164,8 +204,8 @@ Jaeger (visible as `request_id=...` on the root span). Two paths:
 - **Logs → Jaeger:** copy the `request_id` UUID from a log line, paste it into
   Jaeger's "Tags" search box: `request_id=<uuid>`.
 - **Jaeger → Logs:** in Grafana, configure a Trace-to-Logs link that maps
-  `traceID` to a Loki query on `request_id`. Or just copy the request id from
-  the trace's root span tags and search Loki / Kibana directly.
+  `traceID` to a Loki query on `request_id`. Or copy the request id from the
+  trace's root span tags and search Loki directly.
 
 ---
 
@@ -177,7 +217,121 @@ warm-up, config fetch), split it into `/health/live` and `/health/ready`.
 
 ---
 
-## 5. Common runbook
+## 5. Load tests
+
+Load tests live in `crates/loadtest/` and use the [Goose](https://book.goose.rs/)
+framework — a Rust port of the Python Locust load testing tool. They run against a
+**live API on `localhost:8080`** and require a **seeded database**.
+
+### Prerequisites — seed the database
+
+The load tests pull fixture data (house IDs, person IDs, unpaid bookings, free calendar
+windows) at startup. Without seeded data the test will immediately error.
+
+```bash
+just seed-fresh       # truncate all data, then load full volumes
+                      # (~1 k managers, 100 k persons, 10 k addresses, 10 k houses)
+
+just seed-load-small  # load a tiny dataset for quick smoke tests
+just seed-verify      # print row counts per table to confirm seed completed
+```
+
+Write scenarios (`create_booking`, `record_payment`) **consume seeded data** — each
+run depletes unpaid bookings and free calendar windows. After a few write runs, reseed:
+
+```bash
+just seed-fresh && just loadtest-write
+```
+
+### Running load tests
+
+The API must be running first. Use `cargo run` or `just compose-up` depending on
+whether you want full observability wired up alongside the test.
+
+```bash
+# Check all available Goose options (users, hatch-rate, run-time, report-file, ...)
+just loadtest-help
+
+# Quick sanity check — 5 virtual users for 10 seconds
+just loadtest-smoke
+
+# Read-only baseline — 50 users for 1 minute; writes an HTML report
+just loadtest-baseline
+
+# Read + write mix (create_booking, record_payment) — 50 users for 3 minutes
+just loadtest-write
+
+# Reseed then run the read-only baseline in one shot (slow: ~12 min seed + 1 min test)
+just loadtest-fresh
+
+# Reseed then run the write mix in one shot
+just loadtest-write-fresh
+
+# Free-form passthrough — pass any goose flags directly
+just loadtest --users 200 --run-time 5m --report-file custom.html
+```
+
+### Turning Autovacuum on and off in Postgres
+
+By default, autovacuum is turned on. This might have some impacts on a performance test. Here are steps to turn it off and on.
+
+#### Turn Autovacuum off
+
+In e.g. pgAdmin do ...
+
+```bash
+alter system set autovacuum = off;
+select pg_reload_conf();
+show autovacuum;
+```
+
+#### Turn Autovacuum on
+
+In e.g. pgAdmin do ...
+
+```bash
+alter system set autovacuum = on;
+select pg_reload_conf();
+show autovacuum;
+```
+
+### Interpreting the HTML report
+
+Each run with `--report-file <name>.html` produces a self-contained HTML file (open
+in any browser). Previously generated reports are committed to the repo root as
+`loadtest-report*.html`.
+
+Key sections to check:
+
+| Section | What to look for |
+|---|---|
+| **Requests** table | Error rate per endpoint — should be 0% for read endpoints, near-0% for writes |
+| **Response times** table | p50 / p95 / p99 latencies — p95 on `GET /api/v1/bookings` should stay under 50 ms on a local Postgres |
+| **Transactions** table | Throughput (req/s) for each scenario weighted by user count |
+| **Errors** section | Any 4xx/5xx detail; unexpected 422s on write scenarios indicate stale fixtures (reseed) |
+
+### Verifying results against Prometheus + Jaeger
+
+Run `just compose-up` before starting the load test so the full observability stack
+is live. Then:
+
+1. **Prometheus** (`http://localhost:9090` → `Graph` tab):
+   - `sum by (endpoint) (rate(http_requests_total[1m]))` — confirm throughput matches the Goose report
+   - `histogram_quantile(0.95, sum by (le, endpoint) (rate(http_requests_duration_seconds_bucket[1m])))` — p95 latency per endpoint
+   - Watch for error-status buckets: `sum by (status) (rate(http_requests_total[1m]))` should show no 5xx
+
+2. **Jaeger** (`http://localhost:16686`):
+   - Set **Lookback** to the load test window; sort by **Duration (desc)** to find the slowest traces
+   - Click a slow booking creation trace to see whether time is lost in the service layer or in the `SELECT … FOR UPDATE` repository span (expected during contention)
+   - Filter by `layer=repository` in the span tag search to isolate DB time
+
+3. **Grafana → Explore → Prometheus**:
+   - `process_resident_memory_bytes{job="rental-api"}` — memory should stay flat under load (no leak)
+   - `rate(http_requests_duration_seconds_sum[1m]) / rate(http_requests_duration_seconds_count[1m])` — average request duration trend
+
+---
+
+## 6. Common runbook
 
 **"Where did this 500 come from?"**
 1. Get the `x-request-id` header from the failing client response.
@@ -206,22 +360,37 @@ warm-up, config fetch), split it into `/health/live` and `/health/ready`.
   traffic.
 - To rule it out entirely, unset `OTEL_EXPORTER_OTLP_ENDPOINT` and restart.
 
+**"Load test write scenarios return many 422 errors"**
+- The write scenarios require unused unpaid bookings and free calendar windows from
+  the seeded data. Once those pools are exhausted the scenarios have nothing to act on.
+- Fix: `just seed-fresh` then rerun the load test.
+
 ---
 
-## 6. Quick reference
+## 7. Quick reference
 
-```
-# Bring up local observability stack
-just db-run         # Postgres
-just obs-up         # Jaeger
+```bash
+# --- Standalone (traces + app, no Grafana) ---
+just db-run         # start Postgres container
+just obs-up         # start Jaeger (UI :16686, OTLP :4317)
 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 cargo run
 
-# Generate some traffic
-curl http://localhost:8080/api/v1/bookings
-curl http://localhost:8080/api/v1/countries
+# --- Full compose stack (all signals) ---
+just compose-up     # app + Postgres + Jaeger + Loki + Prometheus + Grafana
+just compose-down   # stop (data preserved)
 
-# Inspect
-open http://localhost:16686                   # Jaeger UI
-curl http://localhost:8080/metrics            # Prometheus metrics
-curl -i http://localhost:8080/health          # health + x-request-id
+# --- Generate traffic ---
+just api-traffic                                            # one-shot curl
+while sleep 1; do curl -s http://localhost:8080/health; done   # sustained
+
+# --- Load tests (API must be running, DB must be seeded) ---
+just seed-fresh && just loadtest-baseline    # read-only, 1 min
+just seed-fresh && just loadtest-write       # read+write, 3 min
+
+# --- Inspect ---
+open http://localhost:16686          # Jaeger UI
+open http://localhost:3000           # Grafana (anonymous Admin)
+open http://localhost:9090           # Prometheus UI
+curl http://localhost:8080/metrics   # raw Prometheus text
+curl -i http://localhost:8080/health # health + x-request-id header
 ```

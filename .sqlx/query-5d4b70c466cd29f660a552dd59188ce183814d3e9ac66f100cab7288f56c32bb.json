@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE addresses SET street = $1, number = $2, postcode = $3, city = $4, province = $5, country_id = $6 WHERE id = $7",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "5d4b70c466cd29f660a552dd59188ce183814d3e9ac66f100cab7288f56c32bb"
+}

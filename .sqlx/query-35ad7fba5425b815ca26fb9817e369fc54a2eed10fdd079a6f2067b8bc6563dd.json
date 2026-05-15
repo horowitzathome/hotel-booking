@@ -1,0 +1,92 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            b.id,\n            b.house_id,\n            h.name           AS house_name,\n            b.person_id,\n            p.first_name     AS person_first_name,\n            p.last_name      AS person_last_name,\n            b.from_date,\n            b.to_date,\n            b.status         AS \"status: BookingStatus\",\n            b.paid_at,\n            b.total_paid\n        FROM bookings b\n        JOIN houses h  ON h.id = b.house_id\n        JOIN persons p ON p.id = b.person_id\n        WHERE b.id = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "house_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "house_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "person_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "person_first_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "person_last_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "from_date",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 7,
+        "name": "to_date",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 8,
+        "name": "status: BookingStatus",
+        "type_info": {
+          "Custom": {
+            "name": "booking_status",
+            "kind": {
+              "Enum": [
+                "Active",
+                "Cancelled"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "paid_at",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 10,
+        "name": "total_paid",
+        "type_info": "Numeric"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "35ad7fba5425b815ca26fb9817e369fc54a2eed10fdd079a6f2067b8bc6563dd"
+}

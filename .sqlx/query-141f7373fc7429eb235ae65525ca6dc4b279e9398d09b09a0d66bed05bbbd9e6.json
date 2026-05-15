@@ -1,0 +1,53 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT id, date, status AS \"status: CalendarStatus\", price\n        FROM calendar\n        WHERE house_id = $1 AND date BETWEEN $2 AND $3\n        ORDER BY date\n        FOR UPDATE\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "date",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 2,
+        "name": "status: CalendarStatus",
+        "type_info": {
+          "Custom": {
+            "name": "calendar_status",
+            "kind": {
+              "Enum": [
+                "NotRentable",
+                "Rentable",
+                "Rented"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "price",
+        "type_info": "Numeric"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Date",
+        "Date"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "141f7373fc7429eb235ae65525ca6dc4b279e9398d09b09a0d66bed05bbbd9e6"
+}

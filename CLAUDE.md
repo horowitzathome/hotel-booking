@@ -152,6 +152,8 @@ When changing the codebase, follow the maintenance rules and prohibited patterns
 
 ## Commit Convention
 
+Never commit by yourself, until explicitly advised in a prompt. 
+
 Format: `<type>(<scope>): <subject>`
 
 ### Types

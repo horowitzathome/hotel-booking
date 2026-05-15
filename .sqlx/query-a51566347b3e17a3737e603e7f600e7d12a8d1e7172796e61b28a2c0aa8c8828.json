@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, date, status AS \"status: CalendarStatus\", price FROM calendar WHERE id = $1 AND house_id = $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "date",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 2,
+        "name": "status: CalendarStatus",
+        "type_info": {
+          "Custom": {
+            "name": "calendar_status",
+            "kind": {
+              "Enum": [
+                "NotRentable",
+                "Rentable",
+                "Rented"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "price",
+        "type_info": "Numeric"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "a51566347b3e17a3737e603e7f600e7d12a8d1e7172796e61b28a2c0aa8c8828"
+}
