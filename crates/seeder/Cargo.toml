@@ -19,5 +19,5 @@ chrono.workspace = true
 rust_decimal.workspace = true
 
 clap = { version = "4", features = ["derive"] }
-fake = "4"
-rand = "0.9"
+fake = "5.1"
+rand = "0.10"

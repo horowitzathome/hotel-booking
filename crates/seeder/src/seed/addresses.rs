@@ -2,7 +2,7 @@ use crate::seed::BATCH_SIZE;
 use anyhow::{Context, Result, anyhow};
 use fake::Fake;
 use fake::faker::address::en::{BuildingNumber, CityName, PostCode, StateName, StreetName};
-use rand::Rng;
+use rand::RngExt;
 use rand::seq::IndexedRandom;
 use sqlx::PgPool;
 

@@ -1,6 +1,6 @@
 use anyhow::{Result, anyhow};
 use chrono::{Duration, NaiveDate};
-use rand::Rng;
+use rand::RngExt;
 use rand::seq::IndexedRandom;
 use rust_decimal::Decimal;
 use sqlx::PgPool;
