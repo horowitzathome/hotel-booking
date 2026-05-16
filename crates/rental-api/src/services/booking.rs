@@ -2,7 +2,8 @@ use chrono::NaiveDate;
 use sqlx::PgPool;
 
 use crate::errors::AppError;
-use crate::models::booking::{Booking, CreateBookingRequest, RecordPaymentRequest};
+use crate::models::booking::{Booking, BookingStatus, CreateBookingRequest, RecordPaymentRequest};
+use crate::models::calendar::CalendarStatus;
 use crate::repositories::booking as repo;
 
 fn validate_date_range(from: NaiveDate, to: NaiveDate) -> Result<(), AppError> {
@@ -25,19 +26,54 @@ pub async fn get(pool: &PgPool, id: i64) -> Result<Booking, AppError> {
 #[tracing::instrument(skip(pool, req), fields(layer = "service", house_id = req.house_id, person_id = req.person_id))]
 pub async fn create(pool: &PgPool, req: &CreateBookingRequest) -> Result<Booking, AppError> {
     validate_date_range(req.from, req.to)?;
-    let (mut booking, expected_total_price) = repo::create(pool, req).await?;
+
+    let mut tx = pool.begin().await.map_err(AppError::from)?;
+    let entries = repo::fetch_calendar_for_booking(&mut tx, req.house_id, req.from, req.to).await?;
+
+    let expected_days = (req.to - req.from).num_days() + 1;
+    if entries.len() as i64 != expected_days {
+        return Err(AppError::UnprocessableEntity("not all days in the requested range have calendar entries".into()));
+    }
+    if entries.iter().any(|e| e.status != CalendarStatus::Rentable) {
+        return Err(AppError::UnprocessableEntity("all days in range must be in status 'Rentable'".into()));
+    }
+
+    let (booking_id, expected_total_price) = repo::do_create_booking(&mut tx, req, &entries).await?;
+    tx.commit().await.map_err(AppError::from)?;
+
+    let mut booking = repo::find_by_id(pool, booking_id).await?;
     booking.expected_total_price = Some(expected_total_price);
     Ok(booking)
 }
 
 #[tracing::instrument(skip(pool), fields(layer = "service"))]
 pub async fn cancel(pool: &PgPool, id: i64) -> Result<Booking, AppError> {
-    repo::cancel(pool, id).await
+    let mut tx = pool.begin().await.map_err(AppError::from)?;
+    let locked = repo::lock_for_write(&mut tx, id).await?;
+
+    if locked.status == BookingStatus::Cancelled {
+        return Err(AppError::UnprocessableEntity("booking is already cancelled".into()));
+    }
+
+    repo::do_cancel(&mut tx, &locked).await?;
+    tx.commit().await.map_err(AppError::from)?;
+
+    repo::find_by_id(pool, id).await
 }
 
 #[tracing::instrument(skip(pool, req), fields(layer = "service"))]
 pub async fn record_payment(pool: &PgPool, id: i64, req: &RecordPaymentRequest) -> Result<Booking, AppError> {
-    repo::record_payment(pool, id, req).await
+    let mut tx = pool.begin().await.map_err(AppError::from)?;
+    let locked = repo::lock_for_write(&mut tx, id).await?;
+
+    if locked.status == BookingStatus::Cancelled {
+        return Err(AppError::UnprocessableEntity("cannot record payment for a cancelled booking".into()));
+    }
+
+    repo::do_record_payment(&mut tx, id, req).await?;
+    tx.commit().await.map_err(AppError::from)?;
+
+    repo::find_by_id(pool, id).await
 }
 
 #[cfg(test)]

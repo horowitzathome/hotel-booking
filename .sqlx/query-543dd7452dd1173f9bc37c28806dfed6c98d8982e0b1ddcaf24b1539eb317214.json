@@ -1,10 +1,15 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT status AS \"status: BookingStatus\", house_id, from_date, to_date\n        FROM bookings\n        WHERE id = $1\n        FOR UPDATE\n        ",
+  "query": "\n        SELECT id, status AS \"status: BookingStatus\", house_id, from_date, to_date\n        FROM bookings\n        WHERE id = $1\n        FOR UPDATE\n        ",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
         "name": "status: BookingStatus",
         "type_info": {
           "Custom": {
@@ -19,17 +24,17 @@
         }
       },
       {
-        "ordinal": 1,
+        "ordinal": 2,
         "name": "house_id",
         "type_info": "Int8"
       },
       {
-        "ordinal": 2,
+        "ordinal": 3,
         "name": "from_date",
         "type_info": "Date"
       },
       {
-        "ordinal": 3,
+        "ordinal": 4,
         "name": "to_date",
         "type_info": "Date"
       }
@@ -43,8 +48,9 @@
       false,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "2f1962b39c6ec741a2e691ecc69b04646649e32824ff903f8d1bad86dc292489"
+  "hash": "543dd7452dd1173f9bc37c28806dfed6c98d8982e0b1ddcaf24b1539eb317214"
 }

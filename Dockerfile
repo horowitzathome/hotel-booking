@@ -29,8 +29,13 @@ RUN if [ "$TARGETARCH" = "arm64" ]; then \
         echo "aarch64-unknown-linux-musl" > /rust_target; \
     else \
         echo "x86_64-unknown-linux-musl" > /rust_target; \
-    fi && \
-    rustup target add $(cat /rust_target)
+    fi
+
+# Bring rust-toolchain.toml in before any cargo invocation so that rustup
+# activates the pinned toolchain once; the subsequent target add and both
+# cargo builds then all use the same toolchain installation.
+COPY rust-toolchain.toml .
+RUN rustup target add $(cat /rust_target)
 
 COPY --from=planner /app/recipe.json recipe.json
 

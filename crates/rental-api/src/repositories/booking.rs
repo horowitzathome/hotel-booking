@@ -1,9 +1,26 @@
+use chrono::NaiveDate;
 use rust_decimal::Decimal;
-use sqlx::PgPool;
+use sqlx::{PgPool, Postgres, Transaction};
 
 use crate::errors::AppError;
 use crate::models::booking::{Booking, BookingHouse, BookingPerson, BookingStatus, CreateBookingRequest, RecordPaymentRequest};
 use crate::models::calendar::CalendarStatus;
+
+/// Booking row locked for write; carries the fields the service needs for business-rule checks.
+pub struct LockedBooking {
+    pub id: i64,
+    pub status: BookingStatus,
+    pub house_id: i64,
+    pub from_date: NaiveDate,
+    pub to_date: NaiveDate,
+}
+
+/// Calendar row fetched under lock; carries the fields needed to validate and price a booking.
+pub struct CalendarEntryRow {
+    pub id: i64,
+    pub status: CalendarStatus,
+    pub price: Decimal,
+}
 
 #[tracing::instrument(skip(pool), fields(layer = "repository"))]
 pub async fn find_all(pool: &PgPool, house_id: Option<i64>, person_id: Option<i64>) -> Result<Vec<Booking>, AppError> {
@@ -102,37 +119,80 @@ pub async fn find_by_id(pool: &PgPool, id: i64) -> Result<Booking, AppError> {
     })
 }
 
-#[tracing::instrument(skip(pool, req), fields(layer = "repository", house_id = req.house_id, person_id = req.person_id))]
-pub async fn create(pool: &PgPool, req: &CreateBookingRequest) -> Result<(Booking, Decimal), AppError> {
-    let mut tx = pool.begin().await.map_err(AppError::from)?;
-
-    let entries = sqlx::query!(
+/// Locks the booking row for update and returns the fields the service needs to validate.
+/// Returns 404 if the booking does not exist.
+#[tracing::instrument(skip(tx), fields(layer = "repository"))]
+pub async fn lock_for_write(tx: &mut Transaction<'_, Postgres>, id: i64) -> Result<LockedBooking, AppError> {
+    let r = sqlx::query!(
         r#"
-        SELECT id, date, status AS "status: CalendarStatus", price
+        SELECT id, status AS "status: BookingStatus", house_id, from_date, to_date
+        FROM bookings
+        WHERE id = $1
+        FOR UPDATE
+        "#,
+        id,
+    )
+    .fetch_one(&mut **tx)
+    .await
+    .map_err(|e| match e {
+        sqlx::Error::RowNotFound => AppError::NotFound(format!("booking {id} not found")),
+        other => AppError::from(other),
+    })?;
+
+    Ok(LockedBooking { id: r.id, status: r.status, house_id: r.house_id, from_date: r.from_date, to_date: r.to_date })
+}
+
+/// Cancels the booking and releases its calendar days back to Rentable.
+/// Caller must have locked the row via `lock_for_write` in the same transaction.
+#[tracing::instrument(skip(tx, locked), fields(layer = "repository", booking_id = locked.id))]
+pub async fn do_cancel(tx: &mut Transaction<'_, Postgres>, locked: &LockedBooking) -> Result<(), AppError> {
+    sqlx::query!("UPDATE bookings SET status = 'Cancelled', paid_at = NULL, total_paid = NULL WHERE id = $1", locked.id,)
+        .execute(&mut **tx)
+        .await
+        .map_err(AppError::from)?;
+
+    sqlx::query!(
+        "UPDATE calendar SET status = 'Rentable' WHERE house_id = $1 AND date BETWEEN $2 AND $3",
+        locked.house_id,
+        locked.from_date,
+        locked.to_date,
+    )
+    .execute(&mut **tx)
+    .await
+    .map_err(AppError::from)?;
+
+    Ok(())
+}
+
+/// Fetches and locks the calendar entries covering [from, to] for a given house.
+/// Returns the rows in date order; the service validates them before calling `do_create_booking`.
+#[tracing::instrument(skip(tx), fields(layer = "repository", house_id, from = %from, to = %to))]
+pub async fn fetch_calendar_for_booking(tx: &mut Transaction<'_, Postgres>, house_id: i64, from: NaiveDate, to: NaiveDate) -> Result<Vec<CalendarEntryRow>, AppError> {
+    let rows = sqlx::query!(
+        r#"
+        SELECT id, status AS "status: CalendarStatus", price
         FROM calendar
         WHERE house_id = $1 AND date BETWEEN $2 AND $3
         ORDER BY date
         FOR UPDATE
         "#,
-        req.house_id,
-        req.from,
-        req.to,
+        house_id,
+        from,
+        to,
     )
-    .fetch_all(&mut *tx)
+    .fetch_all(&mut **tx)
     .await
     .map_err(AppError::from)?;
 
-    let expected_days = (req.to - req.from).num_days() + 1;
-    if entries.len() as i64 != expected_days {
-        return Err(AppError::UnprocessableEntity("not all days in the requested range have calendar entries".into()));
-    }
+    Ok(rows.into_iter().map(|r| CalendarEntryRow { id: r.id, status: r.status, price: r.price }).collect())
+}
 
-    if entries.iter().any(|e| e.status != CalendarStatus::Rentable) {
-        return Err(AppError::UnprocessableEntity("all days in range must be in status 'Rentable'".into()));
-    }
-
-    let from_calendar_id = entries.first().expect("invariant: entries non-empty after length check").id;
-    let to_calendar_id = entries.last().expect("invariant: entries non-empty after length check").id;
+/// Inserts the booking record and marks the calendar days as Rented.
+/// Caller must have validated `entries` (non-empty, all Rentable) before calling this.
+#[tracing::instrument(skip(tx, req, entries), fields(layer = "repository", house_id = req.house_id, person_id = req.person_id))]
+pub async fn do_create_booking(tx: &mut Transaction<'_, Postgres>, req: &CreateBookingRequest, entries: &[CalendarEntryRow]) -> Result<(i64, Decimal), AppError> {
+    let from_calendar_id = entries.first().expect("invariant: entries non-empty, validated by caller").id;
+    let to_calendar_id = entries.last().expect("invariant: entries non-empty, validated by caller").id;
     let expected_total_price: Decimal = entries.iter().map(|e| e.price).sum();
 
     let booking_id: i64 = sqlx::query_scalar!(
@@ -148,87 +208,26 @@ pub async fn create(pool: &PgPool, req: &CreateBookingRequest) -> Result<(Bookin
         req.from,
         req.to,
     )
-    .fetch_one(&mut *tx)
+    .fetch_one(&mut **tx)
     .await
     .map_err(AppError::from)?;
 
     sqlx::query!("UPDATE calendar SET status = 'Rented' WHERE house_id = $1 AND date BETWEEN $2 AND $3", req.house_id, req.from, req.to,)
-        .execute(&mut *tx)
+        .execute(&mut **tx)
         .await
         .map_err(AppError::from)?;
 
-    tx.commit().await.map_err(AppError::from)?;
-
-    let booking = find_by_id(pool, booking_id).await?;
-    Ok((booking, expected_total_price))
+    Ok((booking_id, expected_total_price))
 }
 
-#[tracing::instrument(skip(pool), fields(layer = "repository"))]
-pub async fn cancel(pool: &PgPool, id: i64) -> Result<Booking, AppError> {
-    let mut tx = pool.begin().await.map_err(AppError::from)?;
-
-    let row = sqlx::query!(
-        r#"
-        SELECT status AS "status: BookingStatus", house_id, from_date, to_date
-        FROM bookings
-        WHERE id = $1
-        FOR UPDATE
-        "#,
-        id,
-    )
-    .fetch_one(&mut *tx)
-    .await
-    .map_err(|e| match e {
-        sqlx::Error::RowNotFound => AppError::NotFound(format!("booking {id} not found")),
-        other => AppError::from(other),
-    })?;
-
-    if row.status == BookingStatus::Cancelled {
-        return Err(AppError::UnprocessableEntity("booking is already cancelled".into()));
-    }
-
-    sqlx::query!("UPDATE bookings SET status = 'Cancelled', paid_at = NULL, total_paid = NULL WHERE id = $1", id,)
-        .execute(&mut *tx)
-        .await
-        .map_err(AppError::from)?;
-
-    sqlx::query!(
-        "UPDATE calendar SET status = 'Rentable' WHERE house_id = $1 AND date BETWEEN $2 AND $3",
-        row.house_id,
-        row.from_date,
-        row.to_date,
-    )
-    .execute(&mut *tx)
-    .await
-    .map_err(AppError::from)?;
-
-    tx.commit().await.map_err(AppError::from)?;
-
-    find_by_id(pool, id).await
-}
-
-#[tracing::instrument(skip(pool, req), fields(layer = "repository"))]
-pub async fn record_payment(pool: &PgPool, id: i64, req: &RecordPaymentRequest) -> Result<Booking, AppError> {
-    let mut tx = pool.begin().await.map_err(AppError::from)?;
-
-    let status = sqlx::query_scalar!(r#"SELECT status AS "status: BookingStatus" FROM bookings WHERE id = $1 FOR UPDATE"#, id,)
-        .fetch_one(&mut *tx)
-        .await
-        .map_err(|e| match e {
-            sqlx::Error::RowNotFound => AppError::NotFound(format!("booking {id} not found")),
-            other => AppError::from(other),
-        })?;
-
-    if status == BookingStatus::Cancelled {
-        return Err(AppError::UnprocessableEntity("cannot record payment for a cancelled booking".into()));
-    }
-
+/// Records payment fields on the booking.
+/// Caller must have validated that the booking is not cancelled before calling this.
+#[tracing::instrument(skip(tx, req), fields(layer = "repository", booking_id = id))]
+pub async fn do_record_payment(tx: &mut Transaction<'_, Postgres>, id: i64, req: &RecordPaymentRequest) -> Result<(), AppError> {
     sqlx::query!("UPDATE bookings SET paid_at = $1, total_paid = $2 WHERE id = $3", req.paid_at, req.total_paid, id,)
-        .execute(&mut *tx)
+        .execute(&mut **tx)
         .await
         .map_err(AppError::from)?;
 
-    tx.commit().await.map_err(AppError::from)?;
-
-    find_by_id(pool, id).await
+    Ok(())
 }
