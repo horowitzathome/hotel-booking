@@ -79,7 +79,7 @@ async fn fetch_fixtures(user: &mut GooseUser) -> TransactionResult {
     // (transitively) a varied pool of person IDs without ever calling
     // GET /api/v1/persons or GET /api/v1/bookings (which would return 100k+ rows).
     let sample_size = house_ids.len().min(50);
-    let sample: Vec<i64> = house_ids.choose_multiple(&mut rand::rng(), sample_size).copied().collect();
+    let sample: Vec<i64> = house_ids.sample(&mut rand::rng(), sample_size).copied().collect();
 
     let mut booking_ids = Vec::new();
     let mut unpaid_booking_ids = Vec::new();
@@ -99,7 +99,7 @@ async fn fetch_fixtures(user: &mut GooseUser) -> TransactionResult {
     // Pre-compute free (Rentable) date windows on a sample of houses, used by
     // create_booking. One full year per house yields plenty of 3-day windows.
     let cal_sample_size = house_ids.len().min(100);
-    let cal_sample: Vec<i64> = house_ids.choose_multiple(&mut rand::rng(), cal_sample_size).copied().collect();
+    let cal_sample: Vec<i64> = house_ids.sample(&mut rand::rng(), cal_sample_size).copied().collect();
     let mut free_windows: Vec<FreeWindow> = Vec::new();
     for h in cal_sample {
         let entries: Vec<CalendarEntryForFixtures> = get_json(user, &format!("/api/v1/houses/{h}/calendar?from=2025-01-01&to=2025-12-31")).await?;
