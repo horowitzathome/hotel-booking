@@ -65,7 +65,6 @@ pub async fn find_all(pool: &PgPool, house_id: Option<i64>, person_id: Option<i6
             from: r.from_date,
             to: r.to_date,
             status: r.status,
-            expected_total_price: None,
             paid_at: r.paid_at,
             total_paid: r.total_paid,
         })
@@ -113,7 +112,6 @@ pub async fn find_by_id(pool: &PgPool, id: i64) -> Result<Booking, AppError> {
         from: r.from_date,
         to: r.to_date,
         status: r.status,
-        expected_total_price: None,
         paid_at: r.paid_at,
         total_paid: r.total_paid,
     })
@@ -139,7 +137,13 @@ pub async fn lock_for_write(tx: &mut Transaction<'_, Postgres>, id: i64) -> Resu
         other => AppError::from(other),
     })?;
 
-    Ok(LockedBooking { id: r.id, status: r.status, house_id: r.house_id, from_date: r.from_date, to_date: r.to_date })
+    Ok(LockedBooking {
+        id: r.id,
+        status: r.status,
+        house_id: r.house_id,
+        from_date: r.from_date,
+        to_date: r.to_date,
+    })
 }
 
 /// Cancels the booking and releases its calendar days back to Rentable.
@@ -184,7 +188,14 @@ pub async fn fetch_calendar_for_booking(tx: &mut Transaction<'_, Postgres>, hous
     .await
     .map_err(AppError::from)?;
 
-    Ok(rows.into_iter().map(|r| CalendarEntryRow { id: r.id, status: r.status, price: r.price }).collect())
+    Ok(rows
+        .into_iter()
+        .map(|r| CalendarEntryRow {
+            id: r.id,
+            status: r.status,
+            price: r.price,
+        })
+        .collect())
 }
 
 /// Inserts the booking record and marks the calendar days as Rented.

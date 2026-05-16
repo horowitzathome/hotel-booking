@@ -80,7 +80,7 @@ async fn create_booking_should_return_expected_total_price(pool: PgPool) {
     .await
     .unwrap();
 
-    assert_eq!(booking.expected_total_price, Some(day_price * rust_decimal::Decimal::from(3)));
+    assert_eq!(booking.expected_total_price, day_price * rust_decimal::Decimal::from(3));
 }
 
 // ---------------------------------------------------------------------------

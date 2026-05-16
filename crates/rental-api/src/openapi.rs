@@ -2,7 +2,7 @@ use utoipa::OpenApi;
 
 use crate::handlers;
 use crate::models::address::{Address, CreateAddressRequest, UpdateAddressRequest};
-use crate::models::booking::{Booking, BookingHouse, BookingPerson, BookingStatus, CreateBookingRequest, RecordPaymentRequest};
+use crate::models::booking::{Booking, BookingHouse, BookingPerson, BookingStatus, CreateBookingRequest, CreateBookingResponse, RecordPaymentRequest};
 use crate::models::calendar::{CalendarEntry, CalendarStatus, CreateCalendarRequest, UpdateCalendarPriceRequest};
 use crate::models::country::{Country, CreateCountryRequest, UpdateCountryRequest};
 use crate::models::house::{CreateHouseRequest, House, UpdateHouseRequest};
@@ -77,6 +77,7 @@ use crate::models::person::{CreatePersonRequest, Person, UpdatePersonRequest};
         BookingHouse,
         BookingPerson,
         Booking,
+        CreateBookingResponse,
         CreateBookingRequest,
         RecordPaymentRequest,
     )),

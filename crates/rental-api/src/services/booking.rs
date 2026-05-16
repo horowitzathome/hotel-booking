@@ -2,7 +2,7 @@ use chrono::NaiveDate;
 use sqlx::PgPool;
 
 use crate::errors::AppError;
-use crate::models::booking::{Booking, BookingStatus, CreateBookingRequest, RecordPaymentRequest};
+use crate::models::booking::{Booking, BookingStatus, CreateBookingRequest, CreateBookingResponse, RecordPaymentRequest};
 use crate::models::calendar::CalendarStatus;
 use crate::repositories::booking as repo;
 
@@ -24,7 +24,7 @@ pub async fn get(pool: &PgPool, id: i64) -> Result<Booking, AppError> {
 }
 
 #[tracing::instrument(skip(pool, req), fields(layer = "service", house_id = req.house_id, person_id = req.person_id))]
-pub async fn create(pool: &PgPool, req: &CreateBookingRequest) -> Result<Booking, AppError> {
+pub async fn create(pool: &PgPool, req: &CreateBookingRequest) -> Result<CreateBookingResponse, AppError> {
     validate_date_range(req.from, req.to)?;
 
     let mut tx = pool.begin().await.map_err(AppError::from)?;
@@ -41,9 +41,8 @@ pub async fn create(pool: &PgPool, req: &CreateBookingRequest) -> Result<Booking
     let (booking_id, expected_total_price) = repo::do_create_booking(&mut tx, req, &entries).await?;
     tx.commit().await.map_err(AppError::from)?;
 
-    let mut booking = repo::find_by_id(pool, booking_id).await?;
-    booking.expected_total_price = Some(expected_total_price);
-    Ok(booking)
+    let booking = repo::find_by_id(pool, booking_id).await?;
+    Ok(CreateBookingResponse { booking, expected_total_price })
 }
 
 #[tracing::instrument(skip(pool), fields(layer = "service"))]

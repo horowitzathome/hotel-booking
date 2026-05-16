@@ -34,10 +34,24 @@ pub struct Booking {
     pub from: NaiveDate,
     pub to: NaiveDate,
     pub status: BookingStatus,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub expected_total_price: Option<Decimal>,
     pub paid_at: Option<NaiveDate>,
     pub total_paid: Option<Decimal>,
+}
+
+/// Response for POST /bookings only: the base booking plus the computed price total.
+/// `expected_total_price` is derived at booking time and not stored in the database.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct CreateBookingResponse {
+    #[serde(flatten)]
+    pub booking: Booking,
+    pub expected_total_price: Decimal,
+}
+
+impl std::ops::Deref for CreateBookingResponse {
+    type Target = Booking;
+    fn deref(&self) -> &Self::Target {
+        &self.booking
+    }
 }
 
 #[derive(Debug, Deserialize, ToSchema, Validate)]

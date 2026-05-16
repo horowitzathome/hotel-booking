@@ -4,7 +4,7 @@ use validator::Validate;
 
 use crate::AppState;
 use crate::errors::AppError;
-use crate::models::booking::{CreateBookingRequest, RecordPaymentRequest};
+use crate::models::booking::{CreateBookingRequest, CreateBookingResponse, RecordPaymentRequest};
 use crate::services::booking as svc;
 
 #[derive(Deserialize)]
@@ -52,7 +52,7 @@ pub async fn get(state: web::Data<AppState>, path: web::Path<i64>) -> Result<Htt
     operation_id = "create_booking",
     request_body = CreateBookingRequest,
     responses(
-        (status = 201, description = "Booking created (includes expected_total_price)", body = crate::models::booking::Booking),
+        (status = 201, description = "Booking created (includes expected_total_price)", body = CreateBookingResponse),
         (status = 409, description = "Unknown house_id or person_id"),
         (status = 422, description = "from > to or any day not Rentable")
     )

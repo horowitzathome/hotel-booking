@@ -44,7 +44,7 @@ dotenvy = "0.15"
 
 # Types
 chrono = { version = "0.4", features = ["serde"] }
-rust_decimal = { version = "1", features = ["serde-with-float"] }
+rust_decimal = { version = "1", features = ["serde-with-arbitrary-precision"] }
 
 # OpenAPI / Swagger UI
 utoipa = { version = "5", features = ["actix_extras", "chrono", "decimal_float"] }
