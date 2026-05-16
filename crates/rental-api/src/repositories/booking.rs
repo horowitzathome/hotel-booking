@@ -209,8 +209,10 @@ pub async fn cancel(pool: &PgPool, id: i64) -> Result<Booking, AppError> {
 
 #[tracing::instrument(skip(pool, req), fields(layer = "repository"))]
 pub async fn record_payment(pool: &PgPool, id: i64, req: &RecordPaymentRequest) -> Result<Booking, AppError> {
-    let status = sqlx::query_scalar!(r#"SELECT status AS "status: BookingStatus" FROM bookings WHERE id = $1"#, id,)
-        .fetch_one(pool)
+    let mut tx = pool.begin().await.map_err(AppError::from)?;
+
+    let status = sqlx::query_scalar!(r#"SELECT status AS "status: BookingStatus" FROM bookings WHERE id = $1 FOR UPDATE"#, id,)
+        .fetch_one(&mut *tx)
         .await
         .map_err(|e| match e {
             sqlx::Error::RowNotFound => AppError::NotFound(format!("booking {id} not found")),
@@ -222,9 +224,11 @@ pub async fn record_payment(pool: &PgPool, id: i64, req: &RecordPaymentRequest) 
     }
 
     sqlx::query!("UPDATE bookings SET paid_at = $1, total_paid = $2 WHERE id = $3", req.paid_at, req.total_paid, id,)
-        .execute(pool)
+        .execute(&mut *tx)
         .await
         .map_err(AppError::from)?;
+
+    tx.commit().await.map_err(AppError::from)?;
 
     find_by_id(pool, id).await
 }
