@@ -23,7 +23,7 @@ ties the three together: the same id appears in the log line's span fields, in t
 ### Format
 
 In `APP_ENV=production` the app writes JSON, one event per line, to stdout.
-In `APP_ENV=development` it writes pretty colored output (intended for `cargo run`).
+In `APP_ENV=development` it writes pretty colored output (intended for `just run-dev`).
 
 Each line carries the enclosing span's fields, so a handler-level log automatically
 includes `request_id`, `http.method`, `http.route`, `http.status_code`, `layer`, etc.
@@ -140,7 +140,7 @@ just obs-logs    # tail container logs
 Then point the app at it:
 
 ```bash
-OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 cargo run
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 just run-dev
 ```
 
 Open `http://localhost:16686`, pick **Service: rental-api**, click **Find Traces**.
@@ -245,7 +245,7 @@ just seed-fresh && just loadtest-write
 
 ### Running load tests
 
-The API must be running first. Use `cargo run` or `just compose-up` depending on
+The API must be running first. Use `just run-dev` or `just compose-up` depending on
 whether you want full observability wired up alongside the test.
 
 ```bash
@@ -373,7 +373,7 @@ is live. Then:
 # --- Standalone (traces + app, no Grafana) ---
 just db-run         # start Postgres container
 just obs-up         # start Jaeger (UI :16686, OTLP :4317)
-OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 cargo run
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 just run-dev
 
 # --- Full compose stack (all signals) ---
 just compose-up     # app + Postgres + Jaeger + Loki + Prometheus + Grafana

@@ -79,16 +79,16 @@ Always look first at file Justfile which contains many useful commands. If you d
 Below you find common commands, which also should be available via Justfile. 
 
 ```bash
-cargo build                              # Build debug binary
-cargo build --release                    # Build release binary
-cargo test                               # Run all tests (unit + integration)
-cargo test -- --nocapture               # Run tests with stdout
-cargo fmt                                # Format all Rust files
-cargo fmt --check                        # Check formatting (fails if unformatted)
-cargo clippy -- -D warnings             # Lint (treat warnings as errors)
-cargo audit                              # Audit dependencies for CVEs
-cargo run                                # Run the application
-cargo doc --open                         # Build and open documentation
+just build                # Build debug binary
+just build-release        # Build release binary
+just test                 # Run all tests (unit + integration)
+just test-verbose         # Run tests with stdout
+just fmt                  # Format all Rust files
+just fmt-check            # Check formatting (fails if unformatted)
+just lint                 # Lint (treat warnings as errors)
+just audit                # Audit dependencies for CVEs
+just run-dev              # Run the application
+just doc                  # Build and open documentation
 ```
 
 ## Database Schema Changes
@@ -104,7 +104,7 @@ Workflow when changing the schema:
 just db-migrate-revert        # roll back the current schema
 # edit migrations/0001_initial_schema.up.sql and .down.sql
 just db-migrate               # apply the updated schema
-cargo sqlx prepare            # regenerate .sqlx/ offline query metadata
+just sqlx-prepare             # regenerate .sqlx/ offline query metadata
 ```
 
 The `.sqlx/` files must be committed after any `query!` / `query_as!` macro change, or the Docker build will fail.
@@ -141,7 +141,7 @@ See [`.claude/agents/README.md`](.claude/agents/README.md) for structure, file l
 Before code review, run:
 
 ```bash
-cargo build && cargo test && cargo fmt --check && cargo clippy -- -D warnings
+just ci
 ```
 
 All checks (build, test, format, lint) must pass before invoking reviewers.

@@ -12,7 +12,7 @@ just db-run
 just db-migrate
 
 # Start the API (http://localhost:8080)
-cargo run
+just run-dev
 
 # Swagger UI
 open http://localhost:8080/swagger-ui/
@@ -40,9 +40,9 @@ just compose-down
 ## Running tests
 
 ```bash
-cargo test                       # unit + integration (requires live Postgres)
-cargo clippy -- -D warnings      # lint
-cargo fmt --check                # format check
+just test        # unit + integration (requires live Postgres)
+just lint        # lint
+just fmt-check   # format check
 ```
 
 ## Load tests

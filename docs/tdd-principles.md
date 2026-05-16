@@ -60,7 +60,7 @@ Without TDD, agents write multiple functions before any test exists, guess at re
 - Refactor only when all tests are green.
 - No new behavior during refactor. If the refactoring introduces a new code path, it needs its own Red-Green cycle.
 - Apply the testing vocabulary patterns from [`testing-principles.md`](testing-principles.md): extract factory functions, promote constants, compose higher-level factories.
-- Run `cargo clippy -- -D warnings` after each refactoring step.
+- Run `just lint` after each refactoring step.
 
 ## Quality Gate
 
@@ -68,10 +68,10 @@ Before invoking reviewers, all checks must pass:
 
 | Check | Command |
 |-------|---------|
-| Build | `cargo build` |
-| Test | `cargo test` |
-| Format | `cargo fmt --check` |
-| Lint | `cargo clippy -- -D warnings` |
+| Build | `just build` |
+| Test | `just test` |
+| Format | `just fmt-check` |
+| Lint | `just lint` |
 
 No exceptions. Fix failures before requesting review.
 
@@ -97,4 +97,4 @@ This document defines the methodology. Each implementation applies it:
 
 - **Go:** [`go/.claude/agents/feature-implementer.md`](../go/.claude/agents/feature-implementer.md) — TDD process with Go idioms, `make ci` quality gate
 - **Java Spring Boot:** [`java-spring-boot/.claude/agents/feature-implementer.md`](../java-spring-boot/.claude/agents/feature-implementer.md) — TDD process with Spring Boot conventions, `./gradlew build` quality gate
-- **Rust:** [`rust/.claude/agents/feature-implementer.md`](../rust/.claude/agents/feature-implementer.md) — TDD process with Rust idioms, `cargo build && cargo test && cargo fmt --check && cargo clippy -- -D warnings` quality gate
+- **Rust:** [`rust/.claude/agents/feature-implementer.md`](../rust/.claude/agents/feature-implementer.md) — TDD process with Rust idioms, `just ci` quality gate

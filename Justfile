@@ -106,6 +106,14 @@ fmt:
 fmt-check:
     cargo fmt --all -- --check
 
+# Audit dependencies for known CVEs
+audit:
+    cargo audit
+
+# Build and open the API documentation in a browser
+doc:
+    cargo doc --open
+
 # Pre-commit gate: format check + clippy + tests (tests require a running Postgres)
 check: fmt-check lint test
 
