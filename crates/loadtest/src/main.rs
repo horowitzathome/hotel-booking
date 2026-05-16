@@ -1,6 +1,6 @@
 use chrono::{Duration, NaiveDate};
 use goose::prelude::*;
-use rand::Rng;
+use rand::RngExt;
 use rand::seq::IndexedRandom;
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
