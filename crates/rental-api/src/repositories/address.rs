@@ -53,8 +53,7 @@ pub async fn create(pool: &PgPool, req: &CreateAddressRequest) -> Result<Address
         req.country_id,
     )
     .fetch_one(pool)
-    .await
-    .map_err(AppError::from)?;
+    .await?;
 
     find_by_id(pool, id).await
 }
@@ -74,8 +73,7 @@ pub async fn update(pool: &PgPool, id: i64, req: &UpdateAddressRequest) -> Resul
         id,
     )
     .execute(pool)
-    .await
-    .map_err(AppError::from)?;
+    .await?;
 
     if rows.rows_affected() == 0 {
         return Err(AppError::NotFound(format!("address {id} not found")));

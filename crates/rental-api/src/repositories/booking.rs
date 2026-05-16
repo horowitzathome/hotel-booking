@@ -49,8 +49,7 @@ pub async fn find_all(pool: &PgPool, house_id: Option<i64>, person_id: Option<i6
         person_id,
     )
     .fetch_all(pool)
-    .await
-    .map_err(AppError::from)?;
+    .await?;
 
     Ok(rows
         .into_iter()
@@ -152,8 +151,7 @@ pub async fn lock_for_write(tx: &mut Transaction<'_, Postgres>, id: i64) -> Resu
 pub async fn do_cancel(tx: &mut Transaction<'_, Postgres>, locked: &LockedBooking) -> Result<(), AppError> {
     sqlx::query!("UPDATE bookings SET status = 'Cancelled', paid_at = NULL, total_paid = NULL WHERE id = $1", locked.id,)
         .execute(&mut **tx)
-        .await
-        .map_err(AppError::from)?;
+        .await?;
 
     sqlx::query!(
         "UPDATE calendar SET status = 'Rentable' WHERE house_id = $1 AND date BETWEEN $2 AND $3",
@@ -162,8 +160,7 @@ pub async fn do_cancel(tx: &mut Transaction<'_, Postgres>, locked: &LockedBookin
         locked.to_date,
     )
     .execute(&mut **tx)
-    .await
-    .map_err(AppError::from)?;
+    .await?;
 
     Ok(())
 }
@@ -185,8 +182,7 @@ pub async fn fetch_calendar_for_booking(tx: &mut Transaction<'_, Postgres>, hous
         to,
     )
     .fetch_all(&mut **tx)
-    .await
-    .map_err(AppError::from)?;
+    .await?;
 
     Ok(rows
         .into_iter()
@@ -220,13 +216,11 @@ pub async fn do_create_booking(tx: &mut Transaction<'_, Postgres>, req: &CreateB
         req.to,
     )
     .fetch_one(&mut **tx)
-    .await
-    .map_err(AppError::from)?;
+    .await?;
 
     sqlx::query!("UPDATE calendar SET status = 'Rented' WHERE house_id = $1 AND date BETWEEN $2 AND $3", req.house_id, req.from, req.to,)
         .execute(&mut **tx)
-        .await
-        .map_err(AppError::from)?;
+        .await?;
 
     Ok((booking_id, expected_total_price))
 }
@@ -237,8 +231,7 @@ pub async fn do_create_booking(tx: &mut Transaction<'_, Postgres>, req: &CreateB
 pub async fn do_record_payment(tx: &mut Transaction<'_, Postgres>, id: i64, req: &RecordPaymentRequest) -> Result<(), AppError> {
     sqlx::query!("UPDATE bookings SET paid_at = $1, total_paid = $2 WHERE id = $3", req.paid_at, req.total_paid, id,)
         .execute(&mut **tx)
-        .await
-        .map_err(AppError::from)?;
+        .await?;
 
     Ok(())
 }

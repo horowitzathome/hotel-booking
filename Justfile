@@ -110,6 +110,10 @@ fmt-check:
 audit:
     cargo audit
 
+# Check licenses, banned crates, and duplicate versions
+deny:
+    cargo deny check
+
 # Build and open the API documentation in a browser
 doc:
     cargo doc --open

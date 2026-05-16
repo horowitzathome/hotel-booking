@@ -36,8 +36,7 @@ pub async fn find_all(pool: &PgPool) -> Result<Vec<House>, AppError> {
         "#
     )
     .fetch_all(pool)
-    .await
-    .map_err(AppError::from)?;
+    .await?;
 
     Ok(rows
         .into_iter()
@@ -144,8 +143,7 @@ pub async fn create(pool: &PgPool, req: &CreateHouseRequest) -> Result<House, Ap
         req.manager_id,
     )
     .fetch_one(pool)
-    .await
-    .map_err(AppError::from)?;
+    .await?;
 
     find_by_id(pool, id).await
 }
@@ -163,8 +161,7 @@ pub async fn update(pool: &PgPool, id: i64, req: &UpdateHouseRequest) -> Result<
         id,
     )
     .execute(pool)
-    .await
-    .map_err(AppError::from)?;
+    .await?;
 
     if rows.rows_affected() == 0 {
         return Err(AppError::NotFound(format!("house {id} not found")));

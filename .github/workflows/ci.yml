@@ -12,6 +12,13 @@ env:
   SQLX_OFFLINE: "true"
 
 jobs:
+  deny:
+    name: cargo deny
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+
   fmt:
     name: rustfmt
     runs-on: ubuntu-latest

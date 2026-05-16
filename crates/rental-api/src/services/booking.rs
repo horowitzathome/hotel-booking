@@ -27,7 +27,7 @@ pub async fn get(pool: &PgPool, id: i64) -> Result<Booking, AppError> {
 pub async fn create(pool: &PgPool, req: &CreateBookingRequest) -> Result<CreateBookingResponse, AppError> {
     validate_date_range(req.from, req.to)?;
 
-    let mut tx = pool.begin().await.map_err(AppError::from)?;
+    let mut tx = pool.begin().await?;
     let entries = repo::fetch_calendar_for_booking(&mut tx, req.house_id, req.from, req.to).await?;
 
     let expected_days = (req.to - req.from).num_days() + 1;
@@ -39,7 +39,7 @@ pub async fn create(pool: &PgPool, req: &CreateBookingRequest) -> Result<CreateB
     }
 
     let (booking_id, expected_total_price) = repo::do_create_booking(&mut tx, req, &entries).await?;
-    tx.commit().await.map_err(AppError::from)?;
+    tx.commit().await?;
 
     let booking = repo::find_by_id(pool, booking_id).await?;
     Ok(CreateBookingResponse { booking, expected_total_price })
@@ -47,7 +47,7 @@ pub async fn create(pool: &PgPool, req: &CreateBookingRequest) -> Result<CreateB
 
 #[tracing::instrument(skip(pool), fields(layer = "service"))]
 pub async fn cancel(pool: &PgPool, id: i64) -> Result<Booking, AppError> {
-    let mut tx = pool.begin().await.map_err(AppError::from)?;
+    let mut tx = pool.begin().await?;
     let locked = repo::lock_for_write(&mut tx, id).await?;
 
     if locked.status == BookingStatus::Cancelled {
@@ -55,14 +55,14 @@ pub async fn cancel(pool: &PgPool, id: i64) -> Result<Booking, AppError> {
     }
 
     repo::do_cancel(&mut tx, &locked).await?;
-    tx.commit().await.map_err(AppError::from)?;
+    tx.commit().await?;
 
     repo::find_by_id(pool, id).await
 }
 
 #[tracing::instrument(skip(pool, req), fields(layer = "service"))]
 pub async fn record_payment(pool: &PgPool, id: i64, req: &RecordPaymentRequest) -> Result<Booking, AppError> {
-    let mut tx = pool.begin().await.map_err(AppError::from)?;
+    let mut tx = pool.begin().await?;
     let locked = repo::lock_for_write(&mut tx, id).await?;
 
     if locked.status == BookingStatus::Cancelled {
@@ -70,7 +70,7 @@ pub async fn record_payment(pool: &PgPool, id: i64, req: &RecordPaymentRequest) 
     }
 
     repo::do_record_payment(&mut tx, id, req).await?;
-    tx.commit().await.map_err(AppError::from)?;
+    tx.commit().await?;
 
     repo::find_by_id(pool, id).await
 }

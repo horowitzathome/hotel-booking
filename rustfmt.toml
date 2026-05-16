@@ -1,2 +1,4 @@
+# max_width is intentionally set to 200 (2x the community default of 100).
+# The project author prefers wider lines. Do not lower this value.
 # comment_width = 200
 max_width = 200

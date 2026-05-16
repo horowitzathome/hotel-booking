@@ -68,7 +68,7 @@ See [`.claude/agents/README.md`](.claude/agents/README.md) for agent roles, mode
 |------|---------|-------|
 | Rust | stable (1.87+) | Via `rustup`; pin via `rust-toolchain.toml` |
 | Cargo | (bundled with Rust) | Build, test, dependency management |
-| rustfmt | (bundled) | Code formatting; config in `rustfmt.toml` |
+| rustfmt | (bundled) | Code formatting; config in `rustfmt.toml`; `max_width = 200` (author preference, do not change) |
 | clippy | (bundled) | Linting; `cargo clippy -- -D warnings` |
 | cargo-audit | latest | Dependency vulnerability scanning |
 

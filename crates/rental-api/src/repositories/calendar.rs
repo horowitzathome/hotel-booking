@@ -20,8 +20,7 @@ pub async fn find_all(pool: &PgPool, house_id: i64, from: Option<NaiveDate>, to:
         to as Option<NaiveDate>,
     )
     .fetch_all(pool)
-    .await
-    .map_err(AppError::from)?;
+    .await?;
 
     Ok(rows
         .into_iter()
@@ -58,7 +57,7 @@ pub async fn find_by_id(pool: &PgPool, house_id: i64, id: i64) -> Result<Calenda
 
 #[tracing::instrument(skip(pool, req), fields(layer = "repository"))]
 pub async fn create(pool: &PgPool, house_id: i64, req: &CreateCalendarRequest) -> Result<Vec<CalendarEntry>, AppError> {
-    let mut tx = pool.begin().await.map_err(AppError::from)?;
+    let mut tx = pool.begin().await?;
     let mut created = Vec::new();
 
     let mut date = req.from;
@@ -76,8 +75,7 @@ pub async fn create(pool: &PgPool, house_id: i64, req: &CreateCalendarRequest) -
             req.price,
         )
         .fetch_optional(&mut *tx)
-        .await
-        .map_err(AppError::from)?;
+        .await?;
 
         if let Some(r) = row {
             created.push(CalendarEntry {
@@ -91,7 +89,7 @@ pub async fn create(pool: &PgPool, house_id: i64, req: &CreateCalendarRequest) -
         date += Duration::days(1);
     }
 
-    tx.commit().await.map_err(AppError::from)?;
+    tx.commit().await?;
     Ok(created)
 }
 
@@ -110,8 +108,7 @@ pub async fn update_price(pool: &PgPool, house_id: i64, req: &UpdateCalendarPric
         req.to,
     )
     .fetch_all(pool)
-    .await
-    .map_err(AppError::from)?;
+    .await?;
 
     rows.sort_by_key(|r| r.date);
 
@@ -145,8 +142,7 @@ pub async fn delete(pool: &PgPool, house_id: i64, from: NaiveDate, to: NaiveDate
         to,
     )
     .fetch_one(pool)
-    .await
-    .map_err(AppError::from)?;
+    .await?;
 
     if count.unwrap_or(0) > 0 {
         return Err(AppError::Conflict("one or more calendar entries are referenced by active bookings".into()));
@@ -154,8 +150,7 @@ pub async fn delete(pool: &PgPool, house_id: i64, from: NaiveDate, to: NaiveDate
 
     sqlx::query!("DELETE FROM calendar WHERE house_id = $1 AND date BETWEEN $2 AND $3", house_id, from, to,)
         .execute(pool)
-        .await
-        .map_err(AppError::from)?;
+        .await?;
 
     Ok(())
 }

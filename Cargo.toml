@@ -12,7 +12,7 @@ edition = "2024"
 
 [workspace.dependencies]
 # Async runtime
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 
 # HTTP server
 actix-web = "4"
