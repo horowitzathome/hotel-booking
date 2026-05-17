@@ -12,6 +12,8 @@ use crate::services::calendar as svc;
 pub struct CalendarListQuery {
     pub from: Option<NaiveDate>,
     pub to: Option<NaiveDate>,
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
 }
 
 #[derive(Deserialize)]
@@ -28,12 +30,14 @@ pub struct CalendarDeleteQuery {
     params(
         ("house_id" = i64, Path, description = "House id"),
         ("from" = Option<chrono::NaiveDate>, Query, description = "Start date (inclusive)"),
-        ("to" = Option<chrono::NaiveDate>, Query, description = "End date (inclusive)")
+        ("to" = Option<chrono::NaiveDate>, Query, description = "End date (inclusive)"),
+        ("limit" = Option<i64>, Query, description = "Maximum number of results to return"),
+        ("offset" = Option<i64>, Query, description = "Number of results to skip"),
     ),
     responses((status = 200, description = "Calendar entries", body = [crate::models::calendar::CalendarEntry]))
 )]
 pub async fn list(state: web::Data<AppState>, path: web::Path<i64>, query: web::Query<CalendarListQuery>) -> Result<HttpResponse, AppError> {
-    let entries = svc::list(&state.pool, path.into_inner(), query.from, query.to).await?;
+    let entries = svc::list(&state.pool, path.into_inner(), query.from, query.to, query.limit, query.offset).await?;
     Ok(HttpResponse::Ok().json(entries))
 }
 

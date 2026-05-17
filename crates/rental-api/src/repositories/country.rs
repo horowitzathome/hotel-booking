@@ -4,8 +4,10 @@ use crate::errors::AppError;
 use crate::models::country::{Country, CreateCountryRequest, UpdateCountryRequest};
 
 #[tracing::instrument(skip(pool), fields(layer = "repository"))]
-pub async fn find_all(pool: &PgPool) -> Result<Vec<Country>, AppError> {
-    let rows = sqlx::query_as!(Country, "SELECT id, name, iso_code FROM countries ORDER BY name").fetch_all(pool).await?;
+pub async fn find_all(pool: &PgPool, limit: Option<i64>, offset: Option<i64>) -> Result<Vec<Country>, AppError> {
+    let rows = sqlx::query_as!(Country, "SELECT id, name, iso_code FROM countries ORDER BY name LIMIT $1::bigint OFFSET COALESCE($2::bigint, 0)", limit, offset)
+        .fetch_all(pool)
+        .await?;
     Ok(rows)
 }
 

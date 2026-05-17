@@ -4,8 +4,8 @@ use crate::errors::AppError;
 use crate::models::manager::{CreateManagerRequest, Manager, UpdateManagerRequest};
 
 #[tracing::instrument(skip(pool), fields(layer = "repository"))]
-pub async fn find_all(pool: &PgPool) -> Result<Vec<Manager>, AppError> {
-    let rows = sqlx::query_as!(Manager, "SELECT id, first_name, last_name, email, phone FROM managers ORDER BY last_name, first_name")
+pub async fn find_all(pool: &PgPool, limit: Option<i64>, offset: Option<i64>) -> Result<Vec<Manager>, AppError> {
+    let rows = sqlx::query_as!(Manager, "SELECT id, first_name, last_name, email, phone FROM managers ORDER BY last_name, first_name LIMIT $1::bigint OFFSET COALESCE($2::bigint, 0)", limit, offset)
         .fetch_all(pool)
         .await?;
     Ok(rows)

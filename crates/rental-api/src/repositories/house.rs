@@ -7,7 +7,7 @@ use crate::models::house::{CreateHouseRequest, House, UpdateHouseRequest};
 use crate::models::manager::Manager;
 
 #[tracing::instrument(skip(pool), fields(layer = "repository"))]
-pub async fn find_all(pool: &PgPool) -> Result<Vec<House>, AppError> {
+pub async fn find_all(pool: &PgPool, limit: Option<i64>, offset: Option<i64>) -> Result<Vec<House>, AppError> {
     let rows = sqlx::query!(
         r#"
         SELECT
@@ -33,7 +33,10 @@ pub async fn find_all(pool: &PgPool) -> Result<Vec<House>, AppError> {
         JOIN  countries c ON c.id = a.country_id
         JOIN  managers  m ON m.id = h.manager_id
         ORDER BY h.name
-        "#
+        LIMIT $1::bigint OFFSET COALESCE($2::bigint, 0)
+        "#,
+        limit,
+        offset,
     )
     .fetch_all(pool)
     .await?;

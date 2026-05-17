@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, first_name, last_name, email, phone FROM managers ORDER BY last_name, first_name",
+  "query": "SELECT id, first_name, last_name, email, phone FROM persons ORDER BY last_name, first_name LIMIT $1::bigint OFFSET COALESCE($2::bigint, 0)",
   "describe": {
     "columns": [
       {
@@ -30,7 +30,10 @@
       }
     ],
     "parameters": {
-      "Left": []
+      "Left": [
+        "Int8",
+        "Int8"
+      ]
     },
     "nullable": [
       false,
@@ -40,5 +43,5 @@
       false
     ]
   },
-  "hash": "5d920d2625580d38543060329d4da1c52395c8d5a0cc054e1d7725298d7fdd3f"
+  "hash": "9f556b7706e599308fba7105c8b99d5da890b0cb3d7614b84f2a18cdaa64c043"
 }

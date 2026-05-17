@@ -4,4 +4,5 @@ pub mod calendar;
 pub mod country;
 pub mod house;
 pub mod manager;
+pub mod pagination;
 pub mod person;

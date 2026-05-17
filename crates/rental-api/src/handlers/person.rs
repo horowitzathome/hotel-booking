@@ -3,6 +3,7 @@ use validator::Validate;
 
 use crate::AppState;
 use crate::errors::AppError;
+use crate::models::pagination::PaginationQuery;
 use crate::models::person::{CreatePersonRequest, UpdatePersonRequest};
 use crate::services::person as svc;
 
@@ -11,10 +12,11 @@ use crate::services::person as svc;
     path = "/api/v1/persons",
     tag = "persons",
     operation_id = "list_persons",
+    params(PaginationQuery),
     responses((status = 200, description = "List of persons", body = [crate::models::person::Person]))
 )]
-pub async fn list(state: web::Data<AppState>) -> Result<HttpResponse, AppError> {
-    let persons = svc::list(&state.pool).await?;
+pub async fn list(state: web::Data<AppState>, query: web::Query<PaginationQuery>) -> Result<HttpResponse, AppError> {
+    let persons = svc::list(&state.pool, query.limit, query.offset).await?;
     Ok(HttpResponse::Ok().json(persons))
 }
 

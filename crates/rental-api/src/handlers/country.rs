@@ -4,6 +4,7 @@ use validator::Validate;
 use crate::AppState;
 use crate::errors::AppError;
 use crate::models::country::{CreateCountryRequest, UpdateCountryRequest};
+use crate::models::pagination::PaginationQuery;
 use crate::services::country as svc;
 
 #[utoipa::path(
@@ -11,12 +12,13 @@ use crate::services::country as svc;
     path = "/api/v1/countries",
     tag = "countries",
     operation_id = "list_countries",
+    params(PaginationQuery),
     responses(
         (status = 200, description = "List of countries", body = [crate::models::country::Country])
     )
 )]
-pub async fn list(state: web::Data<AppState>) -> Result<HttpResponse, AppError> {
-    let countries = svc::list(&state.pool).await?;
+pub async fn list(state: web::Data<AppState>, query: web::Query<PaginationQuery>) -> Result<HttpResponse, AppError> {
+    let countries = svc::list(&state.pool, query.limit, query.offset).await?;
     Ok(HttpResponse::Ok().json(countries))
 }
 

@@ -142,6 +142,7 @@ Adjacent directories at the crate root:
 | Update request | `Update{Entity}Request` | `UpdateHouseRequest` |
 | Action request | `{Action}{Entity}Request` | `RecordPaymentRequest` |
 | Query-string struct | `{Resource}{Action}Query` (local to handler file) | `BookingListQuery`, `CalendarDeleteQuery` |
+| Pagination params | `models::pagination::PaginationQuery` — shared across all list handlers | `limit: Option<i64>`, `offset: Option<i64>` |
 | Status enum | `{Entity}Status`, `sqlx::Type` with `type_name = "snake_case"` matching the PG enum | `BookingStatus`, `CalendarStatus` |
 | Function names | Snake-case verbs: `list`, `get`, `create`, `update`, `delete`, `cancel`, `record_payment` | |
 | Module aliases | `use crate::services::{x} as svc;` and `use crate::repositories::{x} as repo;` inside handlers and services respectively | |
@@ -400,6 +401,7 @@ Migrations run at startup via `sqlx::migrate!("../../migrations").run(&pool).awa
 - Custom Postgres enums are queried with the explicit type annotation `status AS "status: BookingStatus"` so sqlx maps the Postgres value into the Rust enum.
 - Bind parameters use Postgres positional `$1, $2, …`.
 - Optional filters (`WHERE ($1::bigint IS NULL OR …)`) keep list endpoints to one SQL statement regardless of whether filters are present (`repositories::booking::find_all`, `repositories::calendar::find_all`).
+- All list endpoints support optional `limit` and `offset` query parameters (`models::pagination::PaginationQuery`). Omitting both returns all rows (backward-compatible). The SQL uses `LIMIT $n::bigint OFFSET COALESCE($m::bigint, 0)`; PostgreSQL treats `LIMIT NULL` as no limit.
 
 ### 10.3 Connection Pool
 

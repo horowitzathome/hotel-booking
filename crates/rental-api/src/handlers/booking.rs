@@ -11,6 +11,8 @@ use crate::services::booking as svc;
 pub struct BookingListQuery {
     pub house_id: Option<i64>,
     pub person_id: Option<i64>,
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
 }
 
 #[utoipa::path(
@@ -20,12 +22,14 @@ pub struct BookingListQuery {
     operation_id = "list_bookings",
     params(
         ("house_id" = Option<i64>, Query, description = "Filter by house id"),
-        ("person_id" = Option<i64>, Query, description = "Filter by person id")
+        ("person_id" = Option<i64>, Query, description = "Filter by person id"),
+        ("limit" = Option<i64>, Query, description = "Maximum number of results to return"),
+        ("offset" = Option<i64>, Query, description = "Number of results to skip"),
     ),
     responses((status = 200, description = "List of bookings", body = [crate::models::booking::Booking]))
 )]
 pub async fn list(state: web::Data<AppState>, query: web::Query<BookingListQuery>) -> Result<HttpResponse, AppError> {
-    let bookings = svc::list(&state.pool, query.house_id, query.person_id).await?;
+    let bookings = svc::list(&state.pool, query.house_id, query.person_id, query.limit, query.offset).await?;
     Ok(HttpResponse::Ok().json(bookings))
 }
 

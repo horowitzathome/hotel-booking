@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT\n            b.id,\n            b.house_id,\n            h.name           AS house_name,\n            b.person_id,\n            p.first_name     AS person_first_name,\n            p.last_name      AS person_last_name,\n            b.from_date,\n            b.to_date,\n            b.status         AS \"status: BookingStatus\",\n            b.paid_at,\n            b.total_paid\n        FROM bookings b\n        JOIN houses h  ON h.id = b.house_id\n        JOIN persons p ON p.id = b.person_id\n        WHERE ($1::bigint IS NULL OR b.house_id = $1)\n          AND ($2::bigint IS NULL OR b.person_id = $2)\n        ORDER BY b.id\n        ",
+  "query": "\n        SELECT\n            b.id,\n            b.house_id,\n            h.name           AS house_name,\n            b.person_id,\n            p.first_name     AS person_first_name,\n            p.last_name      AS person_last_name,\n            b.from_date,\n            b.to_date,\n            b.status         AS \"status: BookingStatus\",\n            b.paid_at,\n            b.total_paid\n        FROM bookings b\n        JOIN houses h  ON h.id = b.house_id\n        JOIN persons p ON p.id = b.person_id\n        WHERE ($1::bigint IS NULL OR b.house_id = $1)\n          AND ($2::bigint IS NULL OR b.person_id = $2)\n        ORDER BY b.id\n        LIMIT $3::bigint OFFSET COALESCE($4::bigint, 0)\n        ",
   "describe": {
     "columns": [
       {
@@ -72,6 +72,8 @@
     "parameters": {
       "Left": [
         "Int8",
+        "Int8",
+        "Int8",
         "Int8"
       ]
     },
@@ -89,5 +91,5 @@
       true
     ]
   },
-  "hash": "af54ca0a22a0858c0a498615c66fb23dfe43d969a1624526a336d7c6a19317e1"
+  "hash": "ff32acfe447196768651b9f760ea9b67fabee64f55db8a86eeac4c8a014cbc9a"
 }

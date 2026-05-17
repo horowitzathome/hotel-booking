@@ -20,8 +20,8 @@ fn validate_date_range(from: NaiveDate, to: NaiveDate) -> Result<(), AppError> {
 }
 
 #[tracing::instrument(skip(pool), fields(layer = "service"))]
-pub async fn list(pool: &PgPool, house_id: i64, from: Option<NaiveDate>, to: Option<NaiveDate>) -> Result<Vec<CalendarEntry>, AppError> {
-    repo::find_all(pool, house_id, from, to).await
+pub async fn list(pool: &PgPool, house_id: i64, from: Option<NaiveDate>, to: Option<NaiveDate>, limit: Option<i64>, offset: Option<i64>) -> Result<Vec<CalendarEntry>, AppError> {
+    repo::find_all(pool, house_id, from, to, limit, offset).await
 }
 
 #[tracing::instrument(skip(pool), fields(layer = "service"))]

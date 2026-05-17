@@ -142,6 +142,26 @@ curl -s http://localhost:3000/api/datasources | jq '.[] | {name, type, url}'
 curl -s http://localhost:3000/api/health
 ```
 
+### Pagination
+
+All six list endpoints (`countries`, `managers`, `persons`, `houses`, `bookings`, `calendar`) accept optional `limit` and `offset` query parameters. Omitting both returns all rows (the pre-existing behaviour is unchanged).
+
+```bash
+# First page — 10 countries
+curl -s "http://localhost:8080/api/v1/countries?limit=10&offset=0" | jq length
+
+# Second page
+curl -s "http://localhost:8080/api/v1/countries?limit=10&offset=10" | jq length
+
+# Paginated bookings filtered by house
+curl -s "http://localhost:8080/api/v1/bookings?house_id=1&limit=20&offset=0" | jq length
+
+# Paginated calendar for a house (date filter + pagination)
+curl -s "http://localhost:8080/api/v1/houses/1/calendar?from=2024-06-01&to=2024-12-31&limit=30&offset=0" | jq length
+```
+
+`limit` without `offset` starts from the first row; `offset` without `limit` skips rows but returns all remaining results.
+
 ### Generating traffic
 
 ```bash

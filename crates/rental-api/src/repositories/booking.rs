@@ -23,7 +23,7 @@ pub struct CalendarEntryRow {
 }
 
 #[tracing::instrument(skip(pool), fields(layer = "repository"))]
-pub async fn find_all(pool: &PgPool, house_id: Option<i64>, person_id: Option<i64>) -> Result<Vec<Booking>, AppError> {
+pub async fn find_all(pool: &PgPool, house_id: Option<i64>, person_id: Option<i64>, limit: Option<i64>, offset: Option<i64>) -> Result<Vec<Booking>, AppError> {
     let rows = sqlx::query!(
         r#"
         SELECT
@@ -44,9 +44,12 @@ pub async fn find_all(pool: &PgPool, house_id: Option<i64>, person_id: Option<i6
         WHERE ($1::bigint IS NULL OR b.house_id = $1)
           AND ($2::bigint IS NULL OR b.person_id = $2)
         ORDER BY b.id
+        LIMIT $3::bigint OFFSET COALESCE($4::bigint, 0)
         "#,
         house_id,
         person_id,
+        limit,
+        offset,
     )
     .fetch_all(pool)
     .await?;

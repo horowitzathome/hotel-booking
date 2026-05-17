@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT\n            h.id          AS house_id,\n            h.name        AS house_name,\n            h.description AS house_description,\n            a.id          AS addr_id,\n            a.street      AS addr_street,\n            a.number      AS addr_number,\n            a.postcode    AS addr_postcode,\n            a.city        AS addr_city,\n            a.province    AS addr_province,\n            c.id          AS country_id,\n            c.name        AS country_name,\n            c.iso_code    AS country_iso_code,\n            m.id          AS mgr_id,\n            m.first_name  AS mgr_first_name,\n            m.last_name   AS mgr_last_name,\n            m.email       AS mgr_email,\n            m.phone       AS mgr_phone\n        FROM  houses   h\n        JOIN  addresses a ON a.id = h.address_id\n        JOIN  countries c ON c.id = a.country_id\n        JOIN  managers  m ON m.id = h.manager_id\n        ORDER BY h.name\n        ",
+  "query": "\n        SELECT\n            h.id          AS house_id,\n            h.name        AS house_name,\n            h.description AS house_description,\n            a.id          AS addr_id,\n            a.street      AS addr_street,\n            a.number      AS addr_number,\n            a.postcode    AS addr_postcode,\n            a.city        AS addr_city,\n            a.province    AS addr_province,\n            c.id          AS country_id,\n            c.name        AS country_name,\n            c.iso_code    AS country_iso_code,\n            m.id          AS mgr_id,\n            m.first_name  AS mgr_first_name,\n            m.last_name   AS mgr_last_name,\n            m.email       AS mgr_email,\n            m.phone       AS mgr_phone\n        FROM  houses   h\n        JOIN  addresses a ON a.id = h.address_id\n        JOIN  countries c ON c.id = a.country_id\n        JOIN  managers  m ON m.id = h.manager_id\n        ORDER BY h.name\n        LIMIT $1::bigint OFFSET COALESCE($2::bigint, 0)\n        ",
   "describe": {
     "columns": [
       {
@@ -90,7 +90,10 @@
       }
     ],
     "parameters": {
-      "Left": []
+      "Left": [
+        "Int8",
+        "Int8"
+      ]
     },
     "nullable": [
       false,
@@ -112,5 +115,5 @@
       false
     ]
   },
-  "hash": "7579ea4fa22f83dd18ac01028502f8bda238d1c72b7ea28185a0c7ff87c3294a"
+  "hash": "29316c214869a7b8032bd1ccbb0cc6554100fc02d22f8a92ead53e96023108ef"
 }

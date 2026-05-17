@@ -4,6 +4,7 @@ use validator::Validate;
 use crate::AppState;
 use crate::errors::AppError;
 use crate::models::house::{CreateHouseRequest, UpdateHouseRequest};
+use crate::models::pagination::PaginationQuery;
 use crate::services::house as svc;
 
 #[utoipa::path(
@@ -11,10 +12,11 @@ use crate::services::house as svc;
     path = "/api/v1/houses",
     tag = "houses",
     operation_id = "list_houses",
+    params(PaginationQuery),
     responses((status = 200, description = "List of houses", body = [crate::models::house::House]))
 )]
-pub async fn list(state: web::Data<AppState>) -> Result<HttpResponse, AppError> {
-    let houses = svc::list(&state.pool).await?;
+pub async fn list(state: web::Data<AppState>, query: web::Query<PaginationQuery>) -> Result<HttpResponse, AppError> {
+    let houses = svc::list(&state.pool, query.limit, query.offset).await?;
     Ok(HttpResponse::Ok().json(houses))
 }
 

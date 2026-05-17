@@ -14,8 +14,8 @@ fn validate_date_range(from: NaiveDate, to: NaiveDate) -> Result<(), AppError> {
 }
 
 #[tracing::instrument(skip(pool), fields(layer = "service"))]
-pub async fn list(pool: &PgPool, house_id: Option<i64>, person_id: Option<i64>) -> Result<Vec<Booking>, AppError> {
-    repo::find_all(pool, house_id, person_id).await
+pub async fn list(pool: &PgPool, house_id: Option<i64>, person_id: Option<i64>, limit: Option<i64>, offset: Option<i64>) -> Result<Vec<Booking>, AppError> {
+    repo::find_all(pool, house_id, person_id, limit, offset).await
 }
 
 #[tracing::instrument(skip(pool), fields(layer = "service"))]

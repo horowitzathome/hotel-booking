@@ -4,6 +4,7 @@ use validator::Validate;
 use crate::AppState;
 use crate::errors::AppError;
 use crate::models::manager::{CreateManagerRequest, UpdateManagerRequest};
+use crate::models::pagination::PaginationQuery;
 use crate::services::manager as svc;
 
 #[utoipa::path(
@@ -11,10 +12,11 @@ use crate::services::manager as svc;
     path = "/api/v1/managers",
     tag = "managers",
     operation_id = "list_managers",
+    params(PaginationQuery),
     responses((status = 200, description = "List of managers", body = [crate::models::manager::Manager]))
 )]
-pub async fn list(state: web::Data<AppState>) -> Result<HttpResponse, AppError> {
-    let managers = svc::list(&state.pool).await?;
+pub async fn list(state: web::Data<AppState>, query: web::Query<PaginationQuery>) -> Result<HttpResponse, AppError> {
+    let managers = svc::list(&state.pool, query.limit, query.offset).await?;
     Ok(HttpResponse::Ok().json(managers))
 }
 

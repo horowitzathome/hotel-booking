@@ -5,7 +5,7 @@ use crate::errors::AppError;
 use crate::models::calendar::{CalendarEntry, CalendarStatus, CreateCalendarRequest, UpdateCalendarPriceRequest};
 
 #[tracing::instrument(skip(pool), fields(layer = "repository"))]
-pub async fn find_all(pool: &PgPool, house_id: i64, from: Option<NaiveDate>, to: Option<NaiveDate>) -> Result<Vec<CalendarEntry>, AppError> {
+pub async fn find_all(pool: &PgPool, house_id: i64, from: Option<NaiveDate>, to: Option<NaiveDate>, limit: Option<i64>, offset: Option<i64>) -> Result<Vec<CalendarEntry>, AppError> {
     let rows = sqlx::query!(
         r#"
         SELECT id, date, status AS "status: CalendarStatus", price
@@ -14,10 +14,13 @@ pub async fn find_all(pool: &PgPool, house_id: i64, from: Option<NaiveDate>, to:
           AND ($2::date IS NULL OR date >= $2)
           AND ($3::date IS NULL OR date <= $3)
         ORDER BY date
+        LIMIT $4::bigint OFFSET COALESCE($5::bigint, 0)
         "#,
         house_id,
         from as Option<NaiveDate>,
         to as Option<NaiveDate>,
+        limit,
+        offset,
     )
     .fetch_all(pool)
     .await?;

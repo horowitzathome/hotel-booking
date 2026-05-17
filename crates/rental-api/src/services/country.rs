@@ -5,8 +5,8 @@ use crate::models::country::{Country, CreateCountryRequest, UpdateCountryRequest
 use crate::repositories::country as repo;
 
 #[tracing::instrument(skip(pool), fields(layer = "service"))]
-pub async fn list(pool: &PgPool) -> Result<Vec<Country>, AppError> {
-    repo::find_all(pool).await
+pub async fn list(pool: &PgPool, limit: Option<i64>, offset: Option<i64>) -> Result<Vec<Country>, AppError> {
+    repo::find_all(pool, limit, offset).await
 }
 
 #[tracing::instrument(skip(pool), fields(layer = "service"))]

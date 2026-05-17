@@ -40,7 +40,7 @@ async fn create_booking_should_flip_days_to_rented(pool: PgPool) {
     .await
     .unwrap();
 
-    let entries = cal_svc::list(&pool, house_id, Some(common::d("2024-06-10")), Some(common::d("2024-06-12"))).await.unwrap();
+    let entries = cal_svc::list(&pool, house_id, Some(common::d("2024-06-10")), Some(common::d("2024-06-12")), None, None).await.unwrap();
     assert!(entries.iter().all(|e| e.status == CalendarStatus::Rented));
 }
 
@@ -215,7 +215,7 @@ async fn cancel_booking_should_flip_days_back_to_rentable(pool: PgPool) {
 
     booking_svc::cancel(&pool, booking.id).await.unwrap();
 
-    let entries = cal_svc::list(&pool, house_id, Some(common::d("2024-09-01")), Some(common::d("2024-09-03"))).await.unwrap();
+    let entries = cal_svc::list(&pool, house_id, Some(common::d("2024-09-01")), Some(common::d("2024-09-03")), None, None).await.unwrap();
     assert!(entries.iter().all(|e| e.status == CalendarStatus::Rentable));
 }
 

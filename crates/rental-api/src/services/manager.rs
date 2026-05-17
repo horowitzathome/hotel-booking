@@ -5,8 +5,8 @@ use crate::models::manager::{CreateManagerRequest, Manager, UpdateManagerRequest
 use crate::repositories::manager as repo;
 
 #[tracing::instrument(skip(pool), fields(layer = "service"))]
-pub async fn list(pool: &PgPool) -> Result<Vec<Manager>, AppError> {
-    repo::find_all(pool).await
+pub async fn list(pool: &PgPool, limit: Option<i64>, offset: Option<i64>) -> Result<Vec<Manager>, AppError> {
+    repo::find_all(pool, limit, offset).await
 }
 
 #[tracing::instrument(skip(pool), fields(layer = "service"))]
