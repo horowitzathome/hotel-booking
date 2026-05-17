@@ -122,7 +122,7 @@ doc:
 check: fmt-check lint test
 
 # Same as `check` but also rebuilds in release — closer to what CI does
-ci: fmt-check lint build-release test
+ci: fmt-check lint deny build-release test
 
 # --- Observability: Jaeger (OTLP traces) ---
 
