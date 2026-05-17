@@ -116,9 +116,7 @@ async fn calendar_list_date_filter_and_limit_are_applied_together(pool: PgPool) 
     .unwrap();
 
     // Without limit: all 10 days in the date window
-    let all = cal_svc::list(&pool, house_id, Some(common::d("2024-06-01")), Some(common::d("2024-06-10")), None, None)
-        .await
-        .unwrap();
+    let all = cal_svc::list(&pool, house_id, Some(common::d("2024-06-01")), Some(common::d("2024-06-10")), None, None).await.unwrap();
     assert_eq!(all.len(), 10);
 
     // With limit=3: first 3 days in date order

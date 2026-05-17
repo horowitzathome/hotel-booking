@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use chrono::NaiveDate;
 use rust_decimal::Decimal;
 use sqlx::PgPool;
