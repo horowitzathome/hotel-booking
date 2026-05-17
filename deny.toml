@@ -23,13 +23,11 @@ exceptions = [
 ]
 
 [bans]
-version = 2
 # Warn rather than deny on duplicate versions — duplicates are common in the
 # Rust ecosystem and rarely a problem in practice.
 multiple-versions = "warn"
 
 [sources]
-version = 2
 unknown-registry = "deny"
 unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
